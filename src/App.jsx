@@ -304,7 +304,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ fontFamily: "'DM Sans', sans-serif", minHeight: "100vh", background: "#F9F8F5", color: "#1C1C1A" }}>
+    <div style={{ fontFamily: "'DM Sans', sans-serif", minHeight: "100vh", background: "#F5F3EF", color: "#141412" }}>
       <style>{FONTS}</style>
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -333,7 +333,7 @@ export default function App() {
       `}</style>
 
       {/* Header */}
-      <div style={{ borderBottom: "0.5px solid #E8E7E4", background: "#fff", padding: "0 24px" }}>
+      <div style={{ borderBottom: "0.5px solid #E2DFD8", background: "#FEFDFB", padding: "0 24px", boxShadow: "0 1px 3px rgba(20,18,14,0.04)" }}>
         <div style={{ maxWidth: 820, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 19, color: "#1C1C1A", letterSpacing: "-0.02em" }}>Treasury</span>
@@ -346,7 +346,7 @@ export default function App() {
               <span style={{ fontSize: 12, color: "#C0392B" }}>Live data unavailable</span>
             ) : (
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 18, fontWeight: 500, color: "#1C1C1A", letterSpacing: "-0.02em" }}>
+                <div style={{ fontSize: 19, fontWeight: 500, color: "#0F0E0C", letterSpacing: "-0.03em" }}>
                   {btcPrice ? fmtUSD(Math.round(btcPrice)) : "—"}
                 </div>
                 {distFromATH !== null && (
@@ -361,9 +361,9 @@ export default function App() {
       </div>
 
       {/* Tabs */}
-      <div style={{ background: "#F9F8F5", padding: "12px 24px 0", borderBottom: "0.5px solid #E8E7E4" }}>
+      <div style={{ background: "#F5F3EF", padding: "12px 24px 0", borderBottom: "0.5px solid #E2DFD8" }}>
         <div style={{ maxWidth: 820, margin: "0 auto" }}>
-          <div style={{ display: "inline-flex", background: "#EFEFEC", borderRadius: 8, padding: 3, gap: 2 }}>
+          <div style={{ display: "inline-flex", background: "#EAE8E3", borderRadius: 9, padding: 3, gap: 2 }}>
             {["dashboard", "loans", "indicators", "history"].map((t) => (
               <button key={t} className={`tab-btn${activeTab === t ? " active" : ""}`} onClick={() => setActiveTab(t)}>
                 {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -435,7 +435,7 @@ export default function App() {
                       borderRadius: 4
                     }}>{advice.title}</span>
                   </div>
-                  <div style={{ fontSize: 15, color: "#3A3A38", lineHeight: 1.6, maxWidth: 520 }}>{advice.body}</div>
+                  <div style={{ fontSize: 15, color: "#2A2825", lineHeight: 1.65, maxWidth: 520 }}>{advice.body}</div>
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 36, color: advice.color, lineHeight: 1, letterSpacing: "-0.03em" }}>
@@ -459,7 +459,7 @@ export default function App() {
             {/* Metric Cards */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
               <div className="metric-card">
-                <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Portfolio LTV</div>
+                <div style={{ fontSize: 11, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 9, fontWeight: 500 }}>Portfolio LTV</div>
                 <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 30, letterSpacing: "-0.03em", color: ltvBarColor(portfolioLtv) }}>{fmtPct(portfolioLtv)}</div>
                 <div style={{ marginTop: 8 }}>
                   <div className="ltv-bar-bg">
@@ -468,17 +468,17 @@ export default function App() {
                 </div>
               </div>
               <div className="metric-card">
-                <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Total Debt</div>
+                <div style={{ fontSize: 11, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 9, fontWeight: 500 }}>Total Debt</div>
                 <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 30, letterSpacing: "-0.03em" }}>{fmtUSD(totalDebt)}</div>
-                <div style={{ fontSize: 12, color: "#AAA", marginTop: 6 }}>{loans.length} active loan{loans.length !== 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 12, color: "#7A7670", marginTop: 7 }}>{loans.length} active loan{loans.length !== 1 ? "s" : ""}</div>
               </div>
               <div className="metric-card">
-                <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Collateral</div>
+                <div style={{ fontSize: 11, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 9, fontWeight: 500 }}>Collateral</div>
                 <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 30, letterSpacing: "-0.03em" }}>{fmt(totalCollateral, 2)} <span style={{ fontSize: 14, color: "#AAA" }}>BTC</span></div>
-                <div style={{ fontSize: 12, color: "#AAA", marginTop: 6 }}>{btcPrice ? fmtUSD(Math.round(totalCollateral * btcPrice)) : "—"}</div>
+                <div style={{ fontSize: 12, color: "#7A7670", marginTop: 7 }}>{btcPrice ? fmtUSD(Math.round(totalCollateral * btcPrice)) : "—"}</div>
               </div>
               <div className="metric-card">
-                <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Highest LTV</div>
+                <div style={{ fontSize: 11, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 9, fontWeight: 500 }}>Highest LTV</div>
                 <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 30, letterSpacing: "-0.03em", color: ltvBarColor(maxLtv) }}>{fmtPct(maxLtv)}</div>
                 <div style={{ fontSize: 12, color: maxLtv >= 0.5 ? "#C0392B" : maxLtv >= 0.35 ? "#D68910" : "#AAA", marginTop: 6 }}>
                   {maxLtv >= 0.5 ? "⚠ Danger zone" : maxLtv >= 0.35 ? "Caution" : "Healthy"}
@@ -492,11 +492,11 @@ export default function App() {
               {indicators.map((ind) => (
                 <div key={ind.label} className="ind-row">
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 14, color: "#1C1C1A" }}>{ind.label}</span>
+                    <span style={{ fontSize: 14, color: "#1A1816" }}>{ind.label}</span>
                     {ind.auto && <span style={{ fontSize: 10, color: "#C8963A", background: "#FDF3E3", padding: "1px 6px", borderRadius: 3, letterSpacing: "0.04em" }}>AUTO</span>}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 13, color: "#888", fontVariantNumeric: "tabular-nums" }}>{String(ind.value)}</span>
+                    <span style={{ fontSize: 13, color: "#4A4845", fontVariantNumeric: "tabular-nums" }}>{String(ind.value)}</span>
                     <span className="score-chip" style={{
                       background: ind.score > 0 ? "#E8F5ED" : ind.score < 0 ? "#FDECEA" : "#F4F3F0",
                       color: ind.score > 0 ? "#1A6B3A" : ind.score < 0 ? "#C0392B" : "#888"
@@ -509,7 +509,7 @@ export default function App() {
             </div>
 
             {lastUpdated && (
-              <div style={{ fontSize: 11, color: "#CCC", textAlign: "center" }}>
+              <div style={{ fontSize: 11, color: "#A8A49C", textAlign: "center" }}>
                 Auto data last fetched {lastUpdated.toLocaleTimeString()}
               </div>
             )}
