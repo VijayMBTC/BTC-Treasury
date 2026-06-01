@@ -189,7 +189,7 @@ export default function App() {
       setFetchError(false);
       try {
         const res = await fetch(
-          "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=1500&interval=daily"
+          "/api/btc-data"
         );
         const data = await res.json();
         const prices = data.prices;
