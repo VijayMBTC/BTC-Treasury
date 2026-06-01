@@ -78,37 +78,37 @@ function getAdvice(score, maxLtv) {
     level: "emergency",
     title: "Emergency Debt Priority",
     body: "At least one loan has exceeded the 50% danger threshold. Route all incoming cash to pay down that loan balance immediately.",
-    color: "#B03A2E",
-    bg: "#FDF2F1",
-    border: "#E8A99A",
-    badge: { bg: "#B03A2E", text: "#fff" }
+    color: "#7B2D2D",
+    bg: "#FBF2F2",
+    border: "#D4A8A8",
+    badge: { bg: "#7B2D2D", text: "#fff" }
   };
   if (maxLtv > 0.35) return {
     level: "caution",
     title: "Reduce LTV First",
     body: "Split allocation: continue light DCA while directing surplus cash to safely drift LTV below 35%.",
-    color: "#B7770D",
-    bg: "#FEFAEF",
-    border: "#EDD28A",
-    badge: { bg: "#B7770D", text: "#fff" }
+    color: "#8B6914",
+    bg: "#FBF8EF",
+    border: "#D4BC7A",
+    badge: { bg: "#8B6914", text: "#fff" }
   };
   if (score >= 10) return {
     level: "aggressive",
     title: "Generational Buying Signal",
     body: "Maximum macro value. Aggressive accumulation warranted. Formidable multi-year risk-reward window.",
-    color: "#0E6655",
-    bg: "#EDFAF7",
-    border: "#7DCEA0",
-    badge: { bg: "#0E6655", text: "#fff" }
+    color: "#2D5A3D",
+    bg: "#F2F8F4",
+    border: "#8FBD9E",
+    badge: { bg: "#2D5A3D", text: "#fff" }
   };
   if (score >= 3) return {
     level: "accumulate",
     title: "Standard DCA Mode",
     body: "Value zone confirmed. Accumulate spot assets steadily. Your debt framework is secure.",
-    color: "#1A5276",
-    bg: "#EBF5FB",
-    border: "#85C1E9",
-    badge: { bg: "#1A5276", text: "#fff" }
+    color: "#1E3F5A",
+    bg: "#F2F6FA",
+    border: "#8AAEC8",
+    badge: { bg: "#1E3F5A", text: "#fff" }
   };
   if (score >= 0) return {
     level: "hold",
@@ -298,9 +298,9 @@ export default function App() {
   }
 
   const ltvBarColor = (ltv) => {
-    if (ltv >= 0.5) return "#C0392B";
-    if (ltv >= 0.35) return "#D68910";
-    return "#1A6B3A";
+    if (ltv >= 0.5) return "#7B2D2D";
+    if (ltv >= 0.35) return "#8B6914";
+    return "#2D5A3D";
   };
 
   return (
@@ -450,8 +450,8 @@ export default function App() {
                   <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${Math.max(2, Math.min(100, scorePct))}%`, background: advice.color, borderRadius: 3, transition: "width 0.6s ease" }} />
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                  <span style={{ fontSize: 10, color: "#B03A2E" }}>Bear</span>
-                  <span style={{ fontSize: 10, color: "#0E6655" }}>Bull</span>
+                  <span style={{ fontSize: 10, color: "#7B2D2D" }}>Bear</span>
+                  <span style={{ fontSize: 10, color: "#2D5A3D" }}>Bull</span>
                 </div>
               </div>
             </div>
@@ -499,7 +499,7 @@ export default function App() {
                     <span style={{ fontSize: 13, color: "#4A4845", fontVariantNumeric: "tabular-nums" }}>{String(ind.value)}</span>
                     <span className="score-chip" style={{
                       background: ind.score > 0 ? "#E8F5ED" : ind.score < 0 ? "#FDECEA" : "#F4F3F0",
-                      color: ind.score > 0 ? "#1A6B3A" : ind.score < 0 ? "#C0392B" : "#888"
+                      color: ind.score > 0 ? "#2D5A3D" : ind.score < 0 ? "#7B2D2D" : "#6B6760"
                     }}>
                       {ind.score > 0 ? "+" : ""}{ind.score}
                     </span>
@@ -729,7 +729,7 @@ export default function App() {
                   </div>
                   {[...scoreHistory].reverse().map((entry, i) => {
                     const sc = entry.score;
-                    const scColor = sc >= 10 ? "#0E6655" : sc >= 3 ? "#1A5276" : sc >= 0 ? "#888" : sc > -6 ? "#B7770D" : "#B03A2E";
+                    const scColor = sc >= 10 ? "#2D5A3D" : sc >= 3 ? "#1E3F5A" : sc >= 0 ? "#888" : sc > -6 ? "#8B6914" : "#7B2D2D";
                     return (
                       <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 60px 90px 70px", gap: 12, padding: "10px 0", borderBottom: "0.5px solid #F4F3F0" }}>
                         <div style={{ fontSize: 13, color: "#555" }}>{entry.date}</div>
