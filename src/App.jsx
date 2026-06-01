@@ -162,6 +162,7 @@ export default function App() {
   const [newLoan, setNewLoan] = useState({ lender: "", debt: "", collateral: "" });
   const [activeTab, setActiveTab] = useState("dashboard");
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [scoreHistory, setScoreHistory] = useState([]);
 
   useEffect(() => {
     try {
@@ -171,6 +172,7 @@ export default function App() {
         if (d.loans) setLoans(d.loans);
         if (d.manual) setManual(d.manual);
         if (d.nextId) setNextId(d.nextId);
+        if (d.scoreHistory) setScoreHistory(d.scoreHistory);
       }
     } catch (e) {}
     setDataLoaded(true);
@@ -179,9 +181,9 @@ export default function App() {
   useEffect(() => {
     if (!dataLoaded) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ loans, manual, nextId }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ loans, manual, nextId, scoreHistory }));
     } catch (e) {}
-  }, [loans, manual, nextId, dataLoaded]);
+  }, [loans, manual, nextId, scoreHistory, dataLoaded]);
 
   useEffect(() => {
     async function fetchData() {
@@ -228,6 +230,16 @@ export default function App() {
     }
     fetchData();
   }, []);
+
+
+  useEffect(() => {
+    if (!btcPrice || !dataLoaded) return;
+    const today = new Date().toISOString().split("T")[0];
+    const alreadyLogged = scoreHistory.some((h) => h.date === today);
+    if (alreadyLogged) return;
+    const entry = { date: today, score: totalScore, btcPrice: Math.round(btcPrice), ltv: Math.round(portfolioLtv * 1000) / 10 };
+    setScoreHistory((prev) => [...prev.slice(-89), entry]);
+  }, [btcPrice, dataLoaded]);
 
   const scores = {
     mvrv: scoreMVRV(manual.mvrv, WEIGHTS.mvrv),
@@ -352,7 +364,7 @@ export default function App() {
       <div style={{ background: "#F9F8F5", padding: "12px 24px 0", borderBottom: "0.5px solid #E8E7E4" }}>
         <div style={{ maxWidth: 820, margin: "0 auto" }}>
           <div style={{ display: "inline-flex", background: "#EFEFEC", borderRadius: 8, padding: 3, gap: 2 }}>
-            {["dashboard", "loans", "indicators"].map((t) => (
+            {["dashboard", "loans", "indicators", "history"].map((t) => (
               <button key={t} className={`tab-btn${activeTab === t ? " active" : ""}`} onClick={() => setActiveTab(t)}>
                 {t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
@@ -657,6 +669,78 @@ export default function App() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+        {activeTab === "history" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div className="metric-card">
+              <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Macro Score History</div>
+              <div style={{ fontSize: 12, color: "#CCC", marginBottom: 20 }}>Logged automatically once per day</div>
+              {scoreHistory.length < 2 ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: "#CCC", fontSize: 14 }}>
+                  <div style={{ fontSize: 32, marginBottom: 12 }}>chart</div>
+                  <div>Your score history will build up here day by day.</div>
+                </div>
+              ) : (
+                <svg width="100%" height="180" viewBox="0 0 600 180" preserveAspectRatio="none">
+                  {(() => {
+                    const data = scoreHistory.slice(-60);
+                    const maxS = 12, minS = -12;
+                    const w = 600, h = 160, padL = 32, padR = 8, padT = 10, padB = 20;
+                    const plotW = w - padL - padR, plotH = h - padT - padB;
+                    const xScale = (i) => padL + (i / (data.length - 1)) * plotW;
+                    const yScale = (s) => padT + ((maxS - s) / (maxS - minS)) * plotH;
+                    const zeroY = yScale(0);
+                    const pts = data.map((d, i) => xScale(i) + "," + yScale(d.score));
+                    const linePath = "M" + pts.join(" L");
+                    const gridLines = [-12, -6, 0, 6, 12];
+                    return (
+                      <g>
+                        <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1A5276" stopOpacity="0.15"/><stop offset="100%" stopColor="#1A5276" stopOpacity="0"/></linearGradient></defs>
+                        {gridLines.map(s => (
+                          <g key={s}>
+                            <line x1={padL} y1={yScale(s)} x2={w-padR} y2={yScale(s)} stroke={s===0?"#CCC":"#F0EFEC"} strokeWidth={s===0?1:0.5} strokeDasharray={s===0?"4,4":"0"}/>
+                            <text x={padL-4} y={yScale(s)+4} textAnchor="end" fontSize="9" fill="#CCC">{s>0?"+"+s:s}</text>
+                          </g>
+                        ))}
+                        <path d={linePath + " L" + xScale(data.length-1) + "," + zeroY + " L" + xScale(0) + "," + zeroY + " Z"} fill="url(#sg)"/>
+                        <path d={linePath} fill="none" stroke="#1A5276" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/>
+                        <circle cx={xScale(data.length-1)} cy={yScale(data[data.length-1].score)} r="3" fill="#1A5276"/>
+                      </g>
+                    );
+                  })()}
+                </svg>
+              )}
+            </div>
+            <div className="metric-card">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase" }}>Log Entries</div>
+                {scoreHistory.length > 0 && (
+                  <button className="btn-ghost" style={{ fontSize: 11, color: "#C0392B", borderColor: "#F4C0C0" }} onClick={() => { if (window.confirm("Clear all history?")) setScoreHistory([]); }}>Clear</button>
+                )}
+              </div>
+              {scoreHistory.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "24px 0", color: "#CCC", fontSize: 13 }}>No entries yet.</div>
+              ) : (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 60px 90px 70px", gap: 12, padding: "0 0 8px", borderBottom: "0.5px solid #EBEBEB" }}>
+                    {["Date","Score","BTC Price","LTV"].map(h => <div key={h} style={{ fontSize: 11, color: "#AAA" }}>{h}</div>)}
+                  </div>
+                  {[...scoreHistory].reverse().map((entry, i) => {
+                    const sc = entry.score;
+                    const scColor = sc >= 10 ? "#0E6655" : sc >= 3 ? "#1A5276" : sc >= 0 ? "#888" : sc > -6 ? "#B7770D" : "#B03A2E";
+                    return (
+                      <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 60px 90px 70px", gap: 12, padding: "10px 0", borderBottom: "0.5px solid #F4F3F0" }}>
+                        <div style={{ fontSize: 13, color: "#555" }}>{entry.date}</div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: scColor }}>{sc > 0 ? "+" : ""}{sc}</div>
+                        <div style={{ fontSize: 13, color: "#555" }}>{entry.btcPrice ? "$" + entry.btcPrice.toLocaleString() : "—"}</div>
+                        <div style={{ fontSize: 13, color: "#555" }}>{entry.ltv != null ? entry.ltv + "%" : "—"}</div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
           </div>
         )}
