@@ -429,7 +429,7 @@ export default function App() {
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
             {/* PRIMARY ACTION CARD */}
-            <div style={{ background: primaryAction.bg, border: "0.5px solid "+primaryAction.border, borderLeft: "4px solid "+primaryAction.color, borderRadius: 16, padding: "28px 28px 24px", boxShadow: "0 4px 16px "+primaryAction.color+"18, 0 1px 3px rgba(20,18,14,0.07)" }}>
+            <div style={{ background: "#FEFDFB", border: "0.5px solid #D8D4CC", borderLeft: "5px solid "+primaryAction.color, borderRadius: 16, padding: "28px 28px 24px", boxShadow: "0 2px 12px rgba(20,18,14,0.08), 0 1px 3px rgba(20,18,14,0.06)" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
                 <div>
                   <div style={{ fontSize: 10, color: primaryAction.color, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Primary Action</div>
@@ -445,14 +445,14 @@ export default function App() {
                   </div>
                 </div>
               </div>
-              <div style={{ fontSize: 15, color: "#1A1816", lineHeight: 1.65, paddingTop: 16, borderTop: "0.5px solid "+primaryAction.border }}>{primaryAction.reason}</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16, paddingTop: 16, borderTop: "0.5px solid "+primaryAction.border }}>
-                <div style={{ background: primaryAction.color+"0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid "+primaryAction.border }}>
+              <div style={{ fontSize: 15, color: "#1A1816", lineHeight: 1.65, paddingTop: 16, borderTop: "0.5px solid #E2DFD8" }}>{primaryAction.reason}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16, paddingTop: 16, borderTop: "0.5px solid #E2DFD8" }}>
+                <div style={{ background: "#F5F3EF", borderRadius: 8, padding: "10px 14px", border: "0.5px solid #E2DFD8" }}>
                   <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Market Valuation</div>
                   <div style={{ fontSize: 13, color: "#1A1816", fontWeight: 600 }}>{valuation.label}</div>
                   <div style={{ fontSize: 11, color: "#6B6760", marginTop: 2 }}>Signal {totalScore > 0 ? "+" : ""}{totalScore}</div>
                 </div>
-                <div style={{ background: primaryAction.color+"0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid "+primaryAction.border }}>
+                <div style={{ background: "#F5F3EF", borderRadius: 8, padding: "10px 14px", border: "0.5px solid #E2DFD8" }}>
                   <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Treasury Risk</div>
                   <div style={{ fontSize: 13, color: "#1A1816", fontWeight: 600 }}>{treasuryRisk.label}</div>
                   <div style={{ fontSize: 11, color: "#6B6760", marginTop: 2 }}>LTV {fmtPct(portfolioLtv)}</div>
