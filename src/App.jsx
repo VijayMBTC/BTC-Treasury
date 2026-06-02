@@ -133,11 +133,11 @@ function getAdvice(score, maxLtv) {
 
 function getTreasuryRisk(portfolioLtv, maxLtv) {
   const dominant = Math.max(portfolioLtv, maxLtv);
-  if (dominant >= 0.50) return { label: "Danger Zone", body: "Liquidation risk is imminent. Immediate debt reduction required.", color: "#7B2D2D", bg: "#FBF2F2", border: "#D4A8A8", badge: { bg: "#7B2D2D", text: "#FAF8F5" }, level: 4 };
-  if (dominant >= 0.40) return { label: "Elevated Risk", body: "Collateral cushion is thin. Prioritise reducing debt before accumulating.", color: "#8B6914", bg: "#FBF8EF", border: "#D4BC7A", badge: { bg: "#8B6914", text: "#FAF8F5" }, level: 3 };
-  if (dominant >= 0.30) return { label: "Moderate Risk", body: "Leverage is manageable but warrants active monitoring.", color: "#7A6830", bg: "#FAF7EE", border: "#CFC090", badge: { bg: "#7A6830", text: "#FAF8F5" }, level: 2 };
-  if (dominant >= 0.20) return { label: "Safe", body: "Healthy collateral structure. Debt is well-covered at current prices.", color: "#2D5A3D", bg: "#F2F8F4", border: "#8FBD9E", badge: { bg: "#2D5A3D", text: "#FAF8F5" }, level: 1 };
-  return { label: "Very Safe", body: "Excellent collateral buffer. Treasury is resilient even in a severe drawdown.", color: "#1E3F5A", bg: "#F2F6FA", border: "#8AAEC8", badge: { bg: "#1E3F5A", text: "#FAF8F5" }, level: 0 };
+  if (dominant >= 0.50) return { label: "Danger Zone", action: "Immediate Attention Required", situation: "Your portfolio LTV has entered the danger threshold.", why: "A modest further decline in BTC price could trigger forced liquidation by your lender, resulting in loss of collateral.", what: "Prioritise debt reduction or add collateral immediately. This takes precedence over any accumulation activity.", color: "#7B2D2D", bg: "#FBF2F2", border: "#D4A8A8", badge: { bg: "#7B2D2D", text: "#FAF8F5" }, level: 4 };
+  if (dominant >= 0.40) return { label: "Elevated Risk", action: "Reduce Risk", situation: "Collateral coverage is thinning as LTV approaches the danger zone.", why: "A 20-25% decline in BTC price from here would push your position into dangerous territory. The margin for error is narrow.", what: "Consider paying down the highest-LTV loan or adding collateral to create a more comfortable buffer before deploying further capital.", color: "#8B6914", bg: "#FBF8EF", border: "#D4BC7A", badge: { bg: "#8B6914", text: "#FAF8F5" }, level: 3 };
+  if (dominant >= 0.30) return { label: "Moderate Risk", action: "Monitor Closely", situation: "Leverage is within acceptable bounds but deserves attention.", why: "Your collateral structure can absorb moderate price weakness, but a sustained drawdown would erode your buffer meaningfully.", what: "No immediate intervention required. Review if BTC declines more than 15-20% from current levels.", color: "#7A6830", bg: "#FAF7EE", border: "#CFC090", badge: { bg: "#7A6830", text: "#FAF8F5" }, level: 2 };
+  if (dominant >= 0.20) return { label: "Safe", action: "Maintain Structure", situation: "Debt and collateral levels are well-balanced.", why: "Your current LTV provides a healthy buffer against price volatility. The portfolio is structured conservatively.", what: "No action required. Continue your existing strategy and review when market conditions or loan balances change materially.", color: "#2D5A3D", bg: "#F2F8F4", border: "#8FBD9E", badge: { bg: "#2D5A3D", text: "#FAF8F5" }, level: 1 };
+  return { label: "Very Safe", action: "Collateral Efficiency Opportunity", situation: "Portfolio leverage is substantially below optimal levels.", why: "You are holding more collateral than your current debt requires. This capital could be working harder within a still-conservative risk profile.", what: "You may be able to safely release collateral or increase debt capacity while remaining well within safe LTV thresholds.", color: "#1E3F5A", bg: "#F2F6FA", border: "#8AAEC8", badge: { bg: "#1E3F5A", text: "#FAF8F5" }, level: 0 };
 }
 
 function getValuation(score) {
@@ -448,7 +448,26 @@ export default function App() {
                   <span style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500 }}>Portfolio LTV</span>
                 </div>
               </div>
-              <div style={{ fontSize: 15, color: "#1A1816", lineHeight: 1.6, marginBottom: 16, paddingBottom: 16, borderBottom: "0.5px solid "+treasuryRisk.border }}>{treasuryRisk.body}</div>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ background: treasuryRisk.color+"0A", border: "0.5px solid "+treasuryRisk.border, borderRadius: 10, padding: "16px 18px" }}>
+                  <div style={{ fontSize: 10, color: treasuryRisk.color, letterSpacing: "0.09em", textTransform: "uppercase", fontWeight: 600, marginBottom: 6 }}>Recommended Action</div>
+                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: treasuryRisk.color, letterSpacing: "-0.01em", marginBottom: 14, lineHeight: 1.2 }}>{treasuryRisk.action}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>Situation</div>
+                      <div style={{ fontSize: 13, color: "#2A2825", lineHeight: 1.55 }}>{treasuryRisk.situation}</div>
+                    </div>
+                    <div style={{ borderTop: "0.5px solid "+treasuryRisk.border, paddingTop: 10 }}>
+                      <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>Why It Matters</div>
+                      <div style={{ fontSize: 13, color: "#2A2825", lineHeight: 1.55 }}>{treasuryRisk.why}</div>
+                    </div>
+                    <div style={{ borderTop: "0.5px solid "+treasuryRisk.border, paddingTop: 10 }}>
+                      <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>What to Consider</div>
+                      <div style={{ fontSize: 13, color: "#2A2825", lineHeight: 1.55 }}>{treasuryRisk.what}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
               {(() => {
                 const rzones = [{ label: "Very Safe", color: "#1E3F5A" }, { label: "Safe", color: "#2D5A3D" }, { label: "Moderate\nRisk", color: "#7A6830" }, { label: "Elevated\nRisk", color: "#8B6914" }, { label: "Danger\nZone", color: "#7B2D2D" }];
                 const rPct = Math.max(2, Math.min(98, portfolioLtv * 160));
