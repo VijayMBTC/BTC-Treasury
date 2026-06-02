@@ -399,7 +399,7 @@ export default function App() {
         {activeTab === "dashboard" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-            <div style={{ fontSize: 10, color: "#A8A49C", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 500, paddingLeft: 2 }}>Market Valuation</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: 2, marginBottom: 4 }}><span style={{ fontSize: 12, color: "#1A1816", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>Market Valuation</span><div style={{ flex: 1, height: "1px", background: "#D8D4CC" }} /></div>
             <div style={{ background: valuation.bg, border: "0.5px solid "+valuation.border, borderLeft: "4px solid "+valuation.color, borderRadius: 14, padding: "24px 26px 20px", boxShadow: "0 2px 8px "+valuation.color+"14, 0 0.5px 2px rgba(20,18,14,0.05)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <span style={{ display: "inline-block", background: valuation.badge.bg, color: valuation.badge.text, fontSize: 11, fontWeight: 500, letterSpacing: "0.09em", textTransform: "uppercase", padding: "5px 12px", borderRadius: 5 }}>{valuation.label}</span>
@@ -439,7 +439,7 @@ export default function App() {
               )}
             </div>
 
-            <div style={{ fontSize: 10, color: "#A8A49C", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 500, paddingLeft: 2, marginTop: 8 }}>Treasury Risk</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: 2, marginTop: 8, marginBottom: 4 }}><span style={{ fontSize: 12, color: "#1A1816", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>Treasury Risk</span><div style={{ flex: 1, height: "1px", background: "#D8D4CC" }} /></div>
             <div style={{ background: treasuryRisk.bg, border: "0.5px solid "+treasuryRisk.border, borderLeft: "4px solid "+treasuryRisk.color, borderRadius: 14, padding: "24px 26px 20px", boxShadow: "0 2px 8px "+treasuryRisk.color+"14, 0 0.5px 2px rgba(20,18,14,0.05)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <span style={{ display: "inline-block", background: treasuryRisk.badge.bg, color: treasuryRisk.badge.text, fontSize: 11, fontWeight: 500, letterSpacing: "0.09em", textTransform: "uppercase", padding: "5px 12px", borderRadius: 5 }}>{treasuryRisk.label}</span>
