@@ -147,35 +147,6 @@ function getValuation(score) {
   if (score <= 8) return { label: "Overvalued", body: "Elevated valuations. Consider pausing DCA and reducing leverage exposure.", color: "#8B6914", bg: "#FBF8EF", border: "#D4BC7A", badge: { bg: "#8B6914", text: "#FAF8F5" }, level: 3 };
   return { label: "Euphoria", body: "Extreme overvaluation signals. Historical cycle tops share these conditions.", color: "#7B2D2D", bg: "#FBF2F2", border: "#D4A8A8", badge: { bg: "#7B2D2D", text: "#FAF8F5" }, level: 4 };
 }
-function getPrimaryAction(valuationLevel, riskLevel) {
-  if (riskLevel === 4) return { action: "Reduce Debt Immediately", reason: "Liquidation risk is the immediate priority. Market conditions are irrelevant until leverage is brought under control.", confidence: "High", color: "#7B2D2D", bg: "#FBF2F2", border: "#D4A8A8" };
-  if (riskLevel === 3) {
-    if (valuationLevel <= 1) return { action: "Reduce Debt", reason: "Although Bitcoin appears undervalued, elevated leverage means liquidation risk outweighs the opportunity. Strengthen the treasury first.", confidence: "High", color: "#7B2D2D", bg: "#FBF2F2", border: "#D4A8A8" };
-    return { action: "Reduce Debt", reason: "Leverage is elevated and market conditions do not justify maintaining current risk exposure. Prioritise debt reduction.", confidence: "High", color: "#8B6914", bg: "#FBF8EF", border: "#D4BC7A" };
-  }
-  if (valuationLevel === 0) {
-    if (riskLevel === 0) return { action: "Accumulate Aggressively", reason: "Rare alignment: Bitcoin is deeply undervalued and your treasury structure is exceptionally strong. This is the conditions a long-term holder prepares for.", confidence: "High", color: "#1A5C38", bg: "#EDF7F2", border: "#7DC4A0" };
-    if (riskLevel === 1) return { action: "Accumulate BTC", reason: "Bitcoin appears deeply undervalued and portfolio leverage remains conservative. Strong conditions for systematic accumulation.", confidence: "High", color: "#2D5A3D", bg: "#F2F8F4", border: "#8FBD9E" };
-    return { action: "Accumulate with Caution", reason: "Bitcoin valuation is compelling but moderate leverage warrants a disciplined approach. Accumulate steadily while monitoring LTV.", confidence: "Medium", color: "#2D5A3D", bg: "#F2F8F4", border: "#8FBD9E" };
-  }
-  if (valuationLevel === 1) {
-    if (riskLevel === 0) return { action: "Accumulate BTC", reason: "Bitcoin is trading below fair value and your treasury is in excellent health. Consistent accumulation is well-supported.", confidence: "High", color: "#2D5A3D", bg: "#F2F8F4", border: "#8FBD9E" };
-    if (riskLevel === 1) return { action: "Accumulate BTC", reason: "Valuation and leverage conditions are both favourable. Continue your accumulation strategy.", confidence: "High", color: "#2D5A3D", bg: "#F2F8F4", border: "#8FBD9E" };
-    return { action: "DCA Steadily", reason: "Bitcoin offers value but leverage warrants a measured pace. Maintain regular DCA without increasing debt exposure.", confidence: "Medium", color: "#4A7C5A", bg: "#F4F9F5", border: "#A0C8AD" };
-  }
-  if (valuationLevel === 2) {
-    if (riskLevel <= 1) return { action: "Maintain Position", reason: "Current valuation and leverage conditions do not require portfolio changes. Hold existing positions and monitor indicators.", confidence: "Medium", color: "#4A4845", bg: "#F5F3EF", border: "#C8C4BC" };
-    return { action: "Strengthen Treasury", reason: "Valuation is neutral and leverage is elevated. Reducing debt now improves resilience and future optionality.", confidence: "Medium", color: "#7A6830", bg: "#FAF7EE", border: "#CFC090" };
-  }
-  if (valuationLevel === 3) {
-    if (riskLevel === 0) return { action: "Strengthen Treasury", reason: "Market conditions are less attractive. Reducing leverage now improves future flexibility and positions you well for the next cycle.", confidence: "Medium", color: "#8B6914", bg: "#FBF8EF", border: "#D4BC7A" };
-    if (riskLevel === 1) return { action: "Strengthen Treasury", reason: "Market conditions are less attractive and reducing leverage may improve future flexibility. Pause accumulation.", confidence: "High", color: "#8B6914", bg: "#FBF8EF", border: "#D4BC7A" };
-    return { action: "Reduce Risk", reason: "Overvalued market conditions combined with elevated leverage create an unfavourable risk profile. Prioritise debt reduction.", confidence: "High", color: "#8B6914", bg: "#FBF8EF", border: "#D4BC7A" };
-  }
-  if (riskLevel === 0) return { action: "Consider Trimming", reason: "Extreme overvaluation signals a potential cycle top. Your treasury is strong — consider selectively reducing spot exposure.", confidence: "Medium", color: "#7B2D2D", bg: "#FBF2F2", border: "#D4A8A8" };
-  return { action: "Reduce Risk", reason: "Euphoria-level valuations combined with meaningful leverage creates significant downside risk. Reduce debt and consider trimming.", confidence: "High", color: "#7B2D2D", bg: "#FBF2F2", border: "#D4A8A8" };
-}
-
 function fmt(n, decimals = 2) {
   if (n === null || n === undefined || isNaN(n)) return "—";
   return Number(n).toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
@@ -311,7 +282,6 @@ export default function App() {
   const advice = getAdvice(totalScore, maxLtv);
   const valuation = getValuation(totalScore);
   const treasuryRisk = getTreasuryRisk(portfolioLtv, maxLtv);
-  const primaryAction = getPrimaryAction(valuation.level, treasuryRisk.level);
 
   const maxScore = Object.values(WEIGHTS).reduce((a, b) => a + b, 0);
   const minScore = -maxScore;
@@ -791,36 +761,4 @@ export default function App() {
       </div>
     </div>
   );
-}            {/* PRIMARY ACTION CARD */}
-            <div style={{ background: primaryAction.bg, border: "1px solid "+primaryAction.border, borderRadius: 16, padding: "28px 28px 24px", boxShadow: "0 4px 16px "+primaryAction.color+"1A, 0 1px 3px rgba(20,18,14,0.08)" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontSize: 10, color: primaryAction.color, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Primary Action</div>
-                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, color: primaryAction.color, letterSpacing: "-0.02em", lineHeight: 1.1 }}>{primaryAction.action}</div>
-                </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 6 }}>Confidence</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
-                    {["Low","Medium","High"].map((lvl) => (
-                      <div key={lvl} style={{ width: 28, height: 6, borderRadius: 3, background: (primaryAction.confidence === "High" || (primaryAction.confidence === "Medium" && lvl !== "High") || (primaryAction.confidence === "Low" && lvl === "Low")) ? primaryAction.color : "#EAE8E3", opacity: primaryAction.confidence === "Medium" && lvl === "High" ? 0.25 : 1 }} />
-                    ))}
-                    <span style={{ fontSize: 11, color: primaryAction.color, fontWeight: 600, marginLeft: 4 }}>{primaryAction.confidence}</span>
-                  </div>
-                </div>
-              </div>
-              <div style={{ fontSize: 15, color: "#1A1816", lineHeight: 1.65, paddingTop: 16, borderTop: "0.5px solid "+primaryAction.border }}>{primaryAction.reason}</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16, paddingTop: 16, borderTop: "0.5px solid "+primaryAction.border }}>
-                <div style={{ background: valuation.color+"0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid "+valuation.border }}>
-                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Market Valuation</div>
-                  <div style={{ fontSize: 13, color: valuation.color, fontWeight: 600 }}>{valuation.label}</div>
-                  <div style={{ fontSize: 11, color: "#6B6760", marginTop: 2 }}>Signal {totalScore > 0 ? "+" : ""}{totalScore}</div>
-                </div>
-                <div style={{ background: treasuryRisk.color+"0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid "+treasuryRisk.border }}>
-                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Treasury Risk</div>
-                  <div style={{ fontSize: 13, color: treasuryRisk.color, fontWeight: 600 }}>{treasuryRisk.label}</div>
-                  <div style={{ fontSize: 11, color: "#6B6760", marginTop: 2 }}>LTV {fmtPct(portfolioLtv)}</div>
-                </div>
-              </div>
-            </div>
-
-            
+}
