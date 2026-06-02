@@ -410,14 +410,14 @@ export default function App() {
               </div>
               <div style={{ fontSize: 15, color: "#1A1816", lineHeight: 1.6, marginBottom: 16, paddingBottom: 16, borderBottom: "0.5px solid "+valuation.border }}>{valuation.body}</div>
               {(() => {
-                const vzones = [{ label: "Generational\nOpportunity", color: "#2D5A3D" }, { label: "Accumulation\nZone", color: "#4A7C5A" }, { label: "Fair Value", color: "#8A8680" }, { label: "Overvalued", color: "#8B6914" }, { label: "Euphoria", color: "#7B2D2D" }];
+                const vzones = [{ label: "Generational\nOpportunity", color: "#1A7A4A" }, { label: "Accumulation\nZone", color: "#5BA55A" }, { label: "Fair Value", color: "#9A9590" }, { label: "Overvalued", color: "#C88A1A" }, { label: "Euphoria", color: "#A83030" }];
                 const pct = Math.max(2, Math.min(98, ((totalScore + 12) / 24) * 100));
                 const activeV = totalScore <= -6 ? 0 : totalScore <= 0 ? 1 : totalScore <= 4 ? 2 : totalScore <= 8 ? 3 : 4;
                 return (
                   <div>
                     <div style={{ position: "relative", height: 6, display: "flex", borderRadius: 4, overflow: "hidden", marginBottom: 8 }}>
                       {vzones.map((z, i) => (<div key={i} style={{ flex: 1, background: z.color, opacity: i===activeV ? 0.75 : i < activeV ? 0.35 : 0.15, borderRadius: i===0?"4px 0 0 4px":i===4?"0 4px 4px 0":"0" }} />))}
-                      <div style={{ position: "absolute", top: -2, left: "calc("+pct+"% - 4px)", width: 8, height: 10, borderRadius: 2, background: valuation.color, boxShadow: "0 1px 3px rgba(0,0,0,0.3)", transition: "left 0.6s ease" }} />
+                      <div style={{ position: "absolute", top: -2, left: "calc("+pct+"% - 4px)", width: 10, height: 14, borderRadius: 3, background: "#FEFDFB", border: "2px solid #1A1816", boxShadow: "0 1px 4px rgba(0,0,0,0.4)", transition: "left 0.6s ease", zIndex: 3 }} />
                     </div>
                     <div style={{ display: "flex" }}>
                       {vzones.map((z, i) => (<div key={i} style={{ flex: 1, textAlign: i===0?"left":i===4?"right":"center", fontSize: 9, color: i===activeV?z.color:"#B8B4AC", fontWeight: i===activeV?600:400, lineHeight: 1.3, whiteSpace: "pre-line" }}>{z.label}</div>))}
