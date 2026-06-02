@@ -429,32 +429,32 @@ export default function App() {
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
             {/* PRIMARY ACTION CARD */}
-            <div style={{ background: primaryAction.bg, border: "1px solid "+primaryAction.border, borderRadius: 16, padding: "28px 28px 24px", boxShadow: "0 4px 16px "+primaryAction.color+"1A, 0 1px 3px rgba(20,18,14,0.08)" }}>
+            <div style={{ background: "#1C1A17", border: "1px solid #2E2C28", borderRadius: 16, padding: "28px 28px 24px", boxShadow: "0 4px 20px rgba(20,18,14,0.18), 0 1px 4px rgba(20,18,14,0.12)" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
                 <div>
-                  <div style={{ fontSize: 10, color: primaryAction.color, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Primary Action</div>
-                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, color: primaryAction.color, letterSpacing: "-0.02em", lineHeight: 1.1 }}>{primaryAction.action}</div>
+                  <div style={{ fontSize: 10, color: "#8A8680", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 500, marginBottom: 8 }}>Primary Action</div>
+                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 30, color: "#FAF8F5", letterSpacing: "-0.02em", lineHeight: 1.1 }}>{primaryAction.action}</div>
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 6 }}>Confidence</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
                     {["Low","Medium","High"].map((lvl) => (
-                      <div key={lvl} style={{ width: 28, height: 6, borderRadius: 3, background: (primaryAction.confidence === "High" || (primaryAction.confidence === "Medium" && lvl !== "High") || (primaryAction.confidence === "Low" && lvl === "Low")) ? primaryAction.color : "#EAE8E3", opacity: primaryAction.confidence === "Medium" && lvl === "High" ? 0.25 : 1 }} />
+                      <div key={lvl} style={{ width: 28, height: 6, borderRadius: 3, background: (primaryAction.confidence === "High" || (primaryAction.confidence === "Medium" && lvl !== "High") || (primaryAction.confidence === "Low" && lvl === "Low")) ? "#FAF8F5" : "#3A3835", opacity: primaryAction.confidence === "Medium" && lvl === "High" ? 0.25 : 1 }} />
                     ))}
-                    <span style={{ fontSize: 11, color: primaryAction.color, fontWeight: 600, marginLeft: 4 }}>{primaryAction.confidence}</span>
+                    <span style={{ fontSize: 11, color: "#FAF8F5", fontWeight: 600, marginLeft: 4 }}>{primaryAction.confidence}</span>
                   </div>
                 </div>
               </div>
-              <div style={{ fontSize: 15, color: "#1A1816", lineHeight: 1.65, paddingTop: 16, borderTop: "0.5px solid "+primaryAction.border }}>{primaryAction.reason}</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16, paddingTop: 16, borderTop: "0.5px solid "+primaryAction.border }}>
-                <div style={{ background: valuation.color+"0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid "+valuation.border }}>
+              <div style={{ fontSize: 15, color: "#D8D4CC", lineHeight: 1.65, paddingTop: 16, borderTop: "0.5px solid #2E2C28" }}>{primaryAction.reason}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16, paddingTop: 16, borderTop: "0.5px solid #2E2C28" }}>
+                <div style={{ background: "#2A2825", borderRadius: 8, padding: "10px 14px", border: "0.5px solid #3A3835" }}>
                   <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Market Valuation</div>
-                  <div style={{ fontSize: 13, color: valuation.color, fontWeight: 600 }}>{valuation.label}</div>
+                  <div style={{ fontSize: 13, color: "#FAF8F5", fontWeight: 600 }}>{valuation.label}</div>
                   <div style={{ fontSize: 11, color: "#6B6760", marginTop: 2 }}>Signal {totalScore > 0 ? "+" : ""}{totalScore}</div>
                 </div>
-                <div style={{ background: treasuryRisk.color+"0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid "+treasuryRisk.border }}>
+                <div style={{ background: "#2A2825", borderRadius: 8, padding: "10px 14px", border: "0.5px solid #3A3835" }}>
                   <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Treasury Risk</div>
-                  <div style={{ fontSize: 13, color: treasuryRisk.color, fontWeight: 600 }}>{treasuryRisk.label}</div>
+                  <div style={{ fontSize: 13, color: "#FAF8F5", fontWeight: 600 }}>{treasuryRisk.label}</div>
                   <div style={{ fontSize: 11, color: "#6B6760", marginTop: 2 }}>LTV {fmtPct(portfolioLtv)}</div>
                 </div>
               </div>
