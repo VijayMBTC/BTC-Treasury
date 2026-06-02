@@ -130,6 +130,23 @@ function getAdvice(score, maxLtv) {
   };
 }
 
+
+function getTreasuryRisk(portfolioLtv, maxLtv) {
+  const dominant = Math.max(portfolioLtv, maxLtv);
+  if (dominant >= 0.50) return { label: "Danger Zone", body: "Liquidation risk is imminent. Immediate debt reduction required.", color: "#7B2D2D", bg: "#FBF2F2", border: "#D4A8A8", badge: { bg: "#7B2D2D", text: "#FAF8F5" }, level: 4 };
+  if (dominant >= 0.40) return { label: "Elevated Risk", body: "Collateral cushion is thin. Prioritise reducing debt before accumulating.", color: "#8B6914", bg: "#FBF8EF", border: "#D4BC7A", badge: { bg: "#8B6914", text: "#FAF8F5" }, level: 3 };
+  if (dominant >= 0.30) return { label: "Moderate Risk", body: "Leverage is manageable but warrants active monitoring.", color: "#7A6830", bg: "#FAF7EE", border: "#CFC090", badge: { bg: "#7A6830", text: "#FAF8F5" }, level: 2 };
+  if (dominant >= 0.20) return { label: "Safe", body: "Healthy collateral structure. Debt is well-covered at current prices.", color: "#2D5A3D", bg: "#F2F8F4", border: "#8FBD9E", badge: { bg: "#2D5A3D", text: "#FAF8F5" }, level: 1 };
+  return { label: "Very Safe", body: "Excellent collateral buffer. Treasury is resilient even in a severe drawdown.", color: "#1E3F5A", bg: "#F2F6FA", border: "#8AAEC8", badge: { bg: "#1E3F5A", text: "#FAF8F5" }, level: 0 };
+}
+
+function getValuation(score) {
+  if (score <= -6) return { label: "Generational Opportunity", body: "Multiple indicators signal extreme undervaluation. Historically rare entry conditions.", color: "#2D5A3D", bg: "#F2F8F4", border: "#8FBD9E", badge: { bg: "#2D5A3D", text: "#FAF8F5" }, level: 0 };
+  if (score <= 0) return { label: "Accumulation Zone", body: "Below fair value. Favourable conditions for systematic accumulation.", color: "#4A7C5A", bg: "#F4F9F5", border: "#A0C8AD", badge: { bg: "#4A7C5A", text: "#FAF8F5" }, level: 1 };
+  if (score <= 4) return { label: "Fair Value", body: "Bitcoin is trading near historically fair value. No strong directional signal.", color: "#4A4845", bg: "#F5F3EF", border: "#C8C4BC", badge: { bg: "#4A4845", text: "#FAF8F5" }, level: 2 };
+  if (score <= 8) return { label: "Overvalued", body: "Elevated valuations. Consider pausing DCA and reducing leverage exposure.", color: "#8B6914", bg: "#FBF8EF", border: "#D4BC7A", badge: { bg: "#8B6914", text: "#FAF8F5" }, level: 3 };
+  return { label: "Euphoria", body: "Extreme overvaluation signals. Historical cycle tops share these conditions.", color: "#7B2D2D", bg: "#FBF2F2", border: "#D4A8A8", badge: { bg: "#7B2D2D", text: "#FAF8F5" }, level: 4 };
+}
 function fmt(n, decimals = 2) {
   if (n === null || n === undefined || isNaN(n)) return "—";
   return Number(n).toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
@@ -260,8 +277,11 @@ export default function App() {
     return btcPrice && coll > 0 ? debt / (coll * btcPrice) : 0;
   });
   const maxLtv = loanLtvs.length > 0 ? Math.max(...loanLtvs) : 0;
+  const liquidationDistance = maxLtv > 0 ? Math.max(0, 1 - (maxLtv / 0.80)) : null;
 
   const advice = getAdvice(totalScore, maxLtv);
+  const valuation = getValuation(totalScore);
+  const treasuryRisk = getTreasuryRisk(portfolioLtv, maxLtv);
 
   const maxScore = Object.values(WEIGHTS).reduce((a, b) => a + b, 0);
   const minScore = -maxScore;
@@ -377,133 +397,86 @@ export default function App() {
 
         {/* DASHBOARD TAB */}
         {activeTab === "dashboard" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-            {/* ATH Distance Bar */}
-            {distFromATH !== null && (
-              <div style={{ background: "#fff", border: "0.5px solid #E8E7E4", borderRadius: 12, padding: "16px 24px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase" }}>Distance from All-Time High</div>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                    <span style={{
-                      fontFamily: "'DM Serif Display', serif",
-                      fontSize: 22,
-                      letterSpacing: "-0.02em",
-                      color: distFromATH >= -0.1 ? "#0E6655" : distFromATH >= -0.3 ? "#B7770D" : distFromATH >= -0.5 ? "#B03A2E" : "#7B241C"
-                    }}>
-                      {distFromATH >= 0 ? "ATH" : (distFromATH * 100).toFixed(1) + "%"}
-                    </span>
-                    <span style={{ fontSize: 12, color: "#AAA" }}>
-                      {fmtUSD(Math.round(btcPrice))} / ATH {fmtUSD(Math.round(athPrice))}
-                    </span>
-                  </div>
-                </div>
-                <div style={{ position: "relative", height: 6, background: "#F0EFEC", borderRadius: 4 }}>
-                  <div style={{
-                    position: "absolute", left: 0, top: 0, height: "100%",
-                    width: `${Math.min(100, Math.max(2, (athRecoveryPct || 0) * 100))}%`,
-                    borderRadius: 4,
-                    background: distFromATH >= -0.1 ? "#0E6655" : distFromATH >= -0.3 ? "#D4AC0D" : distFromATH >= -0.5 ? "#C0392B" : "#922B21",
-                    transition: "width 0.6s ease"
-                  }} />
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5 }}>
-                  <span style={{ fontSize: 10, color: "#CCC" }}>0%</span>
-                  <div style={{ display: "flex", gap: 16 }}>
-                    {["-50%", "-25%", "ATH"].map((label, i) => (
-                      <span key={label} style={{ fontSize: 10, color: "#CCC" }}>{label}</span>
-                    ))}
-                  </div>
+            <div style={{ fontSize: 10, color: "#A8A49C", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 500, paddingLeft: 2 }}>Market Valuation</div>
+            <div style={{ background: valuation.bg, border: "0.5px solid "+valuation.border, borderLeft: "4px solid "+valuation.color, borderRadius: 14, padding: "24px 26px 20px", boxShadow: "0 2px 8px "+valuation.color+"14, 0 0.5px 2px rgba(20,18,14,0.05)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <span style={{ display: "inline-block", background: valuation.badge.bg, color: valuation.badge.text, fontSize: 11, fontWeight: 500, letterSpacing: "0.09em", textTransform: "uppercase", padding: "5px 12px", borderRadius: 5 }}>{valuation.label}</span>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+                  <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 34, color: valuation.color, lineHeight: 1, letterSpacing: "-0.03em" }}>{totalScore > 0 ? "+" : ""}{totalScore}</span>
+                  <span style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500 }}>Signal</span>
                 </div>
               </div>
-            )}
-
-            {/* Advice Banner */}
-            <div style={{ background: advice.bg, border: `0.5px solid ${advice.border}`, borderLeft: `3px solid ${advice.color}`, borderRadius: 12, padding: "20px 24px" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <span style={{
-                      display: "inline-block",
-                      background: advice.badge.bg,
-                      color: advice.badge.text,
-                      fontSize: 10,
-                      fontWeight: 500,
-                      letterSpacing: "0.09em",
-                      textTransform: "uppercase",
-                      padding: "3px 9px",
-                      borderRadius: 4
-                    }}>{advice.title}</span>
-                  </div>
-                  <div style={{ fontSize: 15, color: "#2A2825", lineHeight: 1.65, maxWidth: 520 }}>{advice.body}</div>
-                </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 36, color: advice.color, lineHeight: 1, letterSpacing: "-0.03em" }}>
-                    {totalScore > 0 ? "+" : ""}{totalScore}
-                  </div>
-                  <div style={{ fontSize: 10, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 2 }}>Macro Score</div>
-                </div>
-              </div>
-              {/* Score bar */}
-              <div style={{ marginTop: 16 }}>
-                <div style={{ background: `${advice.color}22`, borderRadius: 3, height: 3, position: "relative" }}>
-                  <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${Math.max(2, Math.min(100, scorePct))}%`, background: advice.color, borderRadius: 3, transition: "width 0.6s ease" }} />
-                </div>
-                {(() => {
-                  const zones = [
-                    { label: "Extreme Opportunity", color: "#2D5A3D" },
-                    { label: "Opportunity", color: "#4A7C5A" },
-                    { label: "Fair Value", color: "#8A8680" },
-                    { label: "Expensive", color: "#8B6914" },
-                    { label: "Extreme Risk", color: "#7B2D2D" },
-                  ];
-                  const pct = Math.max(2, Math.min(98, ((totalScore + 12) / 24) * 100));
-                  const activeZone = totalScore <= -6 ? 0 : totalScore <= 0 ? 1 : totalScore <= 4 ? 2 : totalScore <= 8 ? 3 : 4;
-                  return (
-                    <div style={{ marginTop: 8 }}>
-                      <div style={{ position: "relative", height: 6, display: "flex", borderRadius: 4, overflow: "hidden", marginBottom: 10 }}>
-                        {zones.map((z, i) => (
-                          <div key={i} style={{ flex: 1, background: z.color, opacity: i === activeZone ? 0.7 : 0.18 }} />
-                        ))}
-                        <div style={{ position: "absolute", top: -2, left: "calc("+pct+"% - 4px)", width: 8, height: 10, borderRadius: 2, background: advice.color, boxShadow: "0 1px 3px rgba(0,0,0,0.35)", transition: "left 0.6s ease" }} />
-                      </div>
-                      <div style={{ display: "flex" }}>
-                        {zones.map((z, i) => (
-                          <div key={i} style={{ flex: 1, textAlign: i===0?"left":i===4?"right":"center", fontSize: 9, color: i===activeZone ? z.color : "#A8A49C", fontWeight: i===activeZone ? 600 : 400, letterSpacing: "0.02em", lineHeight: 1.3 }}>{z.label}</div>
-                        ))}
-                      </div>
+              <div style={{ fontSize: 15, color: "#1A1816", lineHeight: 1.6, marginBottom: 16, paddingBottom: 16, borderBottom: "0.5px solid "+valuation.border }}>{valuation.body}</div>
+              {(() => {
+                const vzones = [{ label: "Generational\nOpportunity", color: "#2D5A3D" }, { label: "Accumulation\nZone", color: "#4A7C5A" }, { label: "Fair Value", color: "#8A8680" }, { label: "Overvalued", color: "#8B6914" }, { label: "Euphoria", color: "#7B2D2D" }];
+                const pct = Math.max(2, Math.min(98, ((totalScore + 12) / 24) * 100));
+                const activeV = totalScore <= -6 ? 0 : totalScore <= 0 ? 1 : totalScore <= 4 ? 2 : totalScore <= 8 ? 3 : 4;
+                return (
+                  <div>
+                    <div style={{ position: "relative", height: 6, display: "flex", borderRadius: 4, overflow: "hidden", marginBottom: 8 }}>
+                      {vzones.map((z, i) => (<div key={i} style={{ flex: 1, background: z.color, opacity: i===activeV?0.65:0.18, borderRadius: i===0?"4px 0 0 4px":i===4?"0 4px 4px 0":"0" }} />))}
+                      <div style={{ position: "absolute", top: -2, left: "calc("+pct+"% - 4px)", width: 8, height: 10, borderRadius: 2, background: valuation.color, boxShadow: "0 1px 3px rgba(0,0,0,0.3)", transition: "left 0.6s ease" }} />
                     </div>
-                  );
-                })()}
-              </div>
+                    <div style={{ display: "flex" }}>
+                      {vzones.map((z, i) => (<div key={i} style={{ flex: 1, textAlign: i===0?"left":i===4?"right":"center", fontSize: 9, color: i===activeV?z.color:"#B8B4AC", fontWeight: i===activeV?600:400, lineHeight: 1.3, whiteSpace: "pre-line" }}>{z.label}</div>))}
+                    </div>
+                  </div>
+                );
+              })()}
+              {distFromATH !== null && (
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "0.5px solid "+valuation.border, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: "#6B6760", letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 500 }}>From ATH</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 100, height: 3, background: "#EAE8E3", borderRadius: 2, position: "relative" }}>
+                      <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: Math.min(100, Math.max(2, (athRecoveryPct||0)*100))+"%", background: distFromATH >= -0.1 ? "#2D5A3D" : distFromATH >= -0.3 ? "#8B6914" : "#7B2D2D", borderRadius: 2 }} />
+                    </div>
+                    <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 16, color: distFromATH >= -0.1 ? "#2D5A3D" : distFromATH >= -0.3 ? "#8B6914" : "#7B2D2D", letterSpacing: "-0.02em" }}>{distFromATH >= 0 ? "At ATH" : (distFromATH*100).toFixed(1)+"%"}</span>
+                    <span style={{ fontSize: 11, color: "#8A8680" }}>{fmtUSD(Math.round(btcPrice))}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Metric Cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
-              <div className="metric-card">
-                <div style={{ fontSize: 11, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 9, fontWeight: 500 }}>Portfolio LTV</div>
-                <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 30, letterSpacing: "-0.03em", color: ltvBarColor(portfolioLtv) }}>{fmtPct(portfolioLtv)}</div>
-                <div style={{ marginTop: 8 }}>
-                  <div className="ltv-bar-bg">
-                    <div style={{ height: 4, width: `${Math.min(100, portfolioLtv * 100)}%`, background: ltvBarColor(portfolioLtv), borderRadius: 3, transition: "width 0.5s" }} />
-                  </div>
+            <div style={{ fontSize: 10, color: "#A8A49C", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 500, paddingLeft: 2, marginTop: 8 }}>Treasury Risk</div>
+            <div style={{ background: treasuryRisk.bg, border: "0.5px solid "+treasuryRisk.border, borderLeft: "4px solid "+treasuryRisk.color, borderRadius: 14, padding: "24px 26px 20px", boxShadow: "0 2px 8px "+treasuryRisk.color+"14, 0 0.5px 2px rgba(20,18,14,0.05)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <span style={{ display: "inline-block", background: treasuryRisk.badge.bg, color: treasuryRisk.badge.text, fontSize: 11, fontWeight: 500, letterSpacing: "0.09em", textTransform: "uppercase", padding: "5px 12px", borderRadius: 5 }}>{treasuryRisk.label}</span>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+                  <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 34, color: treasuryRisk.color, lineHeight: 1, letterSpacing: "-0.03em" }}>{fmtPct(portfolioLtv)}</span>
+                  <span style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500 }}>Portfolio LTV</span>
                 </div>
               </div>
-              <div className="metric-card">
-                <div style={{ fontSize: 11, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 9, fontWeight: 500 }}>Total Debt</div>
-                <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 30, letterSpacing: "-0.03em" }}>{fmtUSD(totalDebt)}</div>
-                <div style={{ fontSize: 12, color: "#7A7670", marginTop: 7 }}>{loans.length} active loan{loans.length !== 1 ? "s" : ""}</div>
-              </div>
-              <div className="metric-card">
-                <div style={{ fontSize: 11, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 9, fontWeight: 500 }}>Collateral</div>
-                <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 30, letterSpacing: "-0.03em" }}>{fmt(totalCollateral, 2)} <span style={{ fontSize: 14, color: "#AAA" }}>BTC</span></div>
-                <div style={{ fontSize: 12, color: "#7A7670", marginTop: 7 }}>{btcPrice ? fmtUSD(Math.round(totalCollateral * btcPrice)) : "—"}</div>
-              </div>
-              <div className="metric-card">
-                <div style={{ fontSize: 11, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 9, fontWeight: 500 }}>Highest LTV</div>
-                <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 30, letterSpacing: "-0.03em", color: ltvBarColor(maxLtv) }}>{fmtPct(maxLtv)}</div>
-                <div style={{ fontSize: 12, color: maxLtv >= 0.5 ? "#C0392B" : maxLtv >= 0.35 ? "#D68910" : "#AAA", marginTop: 6 }}>
-                  {maxLtv >= 0.5 ? "⚠ Danger zone" : maxLtv >= 0.35 ? "Caution" : "Healthy"}
+              <div style={{ fontSize: 15, color: "#1A1816", lineHeight: 1.6, marginBottom: 16, paddingBottom: 16, borderBottom: "0.5px solid "+treasuryRisk.border }}>{treasuryRisk.body}</div>
+              {(() => {
+                const rzones = [{ label: "Very Safe", color: "#1E3F5A" }, { label: "Safe", color: "#2D5A3D" }, { label: "Moderate\nRisk", color: "#7A6830" }, { label: "Elevated\nRisk", color: "#8B6914" }, { label: "Danger\nZone", color: "#7B2D2D" }];
+                const rPct = Math.max(2, Math.min(98, portfolioLtv * 160));
+                const activeR = portfolioLtv < 0.20 ? 0 : portfolioLtv < 0.30 ? 1 : portfolioLtv < 0.40 ? 2 : portfolioLtv < 0.50 ? 3 : 4;
+                return (
+                  <div>
+                    <div style={{ position: "relative", height: 6, display: "flex", borderRadius: 4, overflow: "hidden", marginBottom: 8 }}>
+                      {rzones.map((z, i) => (<div key={i} style={{ flex: 1, background: z.color, opacity: i===activeR?0.65:0.18, borderRadius: i===0?"4px 0 0 4px":i===4?"0 4px 4px 0":"0" }} />))}
+                      <div style={{ position: "absolute", top: -2, left: "calc("+rPct+"% - 4px)", width: 8, height: 10, borderRadius: 2, background: treasuryRisk.color, boxShadow: "0 1px 3px rgba(0,0,0,0.3)", transition: "left 0.6s ease" }} />
+                    </div>
+                    <div style={{ display: "flex" }}>
+                      {rzones.map((z, i) => (<div key={i} style={{ flex: 1, textAlign: i===0?"left":i===4?"right":"center", fontSize: 9, color: i===activeR?z.color:"#B8B4AC", fontWeight: i===activeR?600:400, lineHeight: 1.3, whiteSpace: "pre-line" }}>{z.label}</div>))}
+                    </div>
+                  </div>
+                );
+              })()}
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: "0.5px solid "+treasuryRisk.border, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Highest LTV</div>
+                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: ltvBarColor(maxLtv), letterSpacing: "-0.02em" }}>{fmtPct(maxLtv)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Total Debt</div>
+                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: "#1A1816", letterSpacing: "-0.02em" }}>{fmtUSD(totalDebt)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Liq. Distance</div>
+                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: liquidationDistance !== null && liquidationDistance < 0.3 ? "#7B2D2D" : "#1A1816", letterSpacing: "-0.02em" }}>{liquidationDistance !== null ? (liquidationDistance*100).toFixed(0)+"%" : "—"}</div>
                 </div>
               </div>
             </div>
