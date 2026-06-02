@@ -240,7 +240,7 @@ function fmtPct(n) {
   return (n * 100).toFixed(1) + "%";
 }
 function fmtUSD(n) {
-  if (no response) return "\u2014";
+  if (!n) return "\u2014";
   return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
