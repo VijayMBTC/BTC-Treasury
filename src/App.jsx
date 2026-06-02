@@ -449,10 +449,32 @@ export default function App() {
                 <div style={{ background: `${advice.color}22`, borderRadius: 3, height: 3, position: "relative" }}>
                   <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${Math.max(2, Math.min(100, scorePct))}%`, background: advice.color, borderRadius: 3, transition: "width 0.6s ease" }} />
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                  <span style={{ fontSize: 10, color: "#7B2D2D" }}>Bear</span>
-                  <span style={{ fontSize: 10, color: "#2D5A3D" }}>Bull</span>
-                </div>
+                {(() => {
+                  const zones = [
+                    { label: "Extreme Opportunity", color: "#2D5A3D" },
+                    { label: "Opportunity", color: "#4A7C5A" },
+                    { label: "Fair Value", color: "#8A8680" },
+                    { label: "Expensive", color: "#8B6914" },
+                    { label: "Extreme Risk", color: "#7B2D2D" },
+                  ];
+                  const pct = Math.max(2, Math.min(98, ((totalScore + 12) / 24) * 100));
+                  const activeZone = totalScore <= -6 ? 0 : totalScore <= 0 ? 1 : totalScore <= 4 ? 2 : totalScore <= 8 ? 3 : 4;
+                  return (
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ position: "relative", height: 6, display: "flex", borderRadius: 4, overflow: "hidden", marginBottom: 10 }}>
+                        {zones.map((z, i) => (
+                          <div key={i} style={{ flex: 1, background: z.color, opacity: i === activeZone ? 0.7 : 0.18 }} />
+                        ))}
+                        <div style={{ position: "absolute", top: -2, left: "calc("+pct+"% - 4px)", width: 8, height: 10, borderRadius: 2, background: advice.color, boxShadow: "0 1px 3px rgba(0,0,0,0.35)", transition: "left 0.6s ease" }} />
+                      </div>
+                      <div style={{ display: "flex" }}>
+                        {zones.map((z, i) => (
+                          <div key={i} style={{ flex: 1, textAlign: i===0?"left":i===4?"right":"center", fontSize: 9, color: i===activeZone ? z.color : "#A8A49C", fontWeight: i===activeZone ? 600 : 400, letterSpacing: "0.02em", lineHeight: 1.3 }}>{z.label}</div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
