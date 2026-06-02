@@ -416,7 +416,7 @@ export default function App() {
                 return (
                   <div>
                     <div style={{ position: "relative", height: 6, display: "flex", borderRadius: 4, overflow: "hidden", marginBottom: 8 }}>
-                      {vzones.map((z, i) => (<div key={i} style={{ flex: 1, background: z.color, opacity: i===activeV?0.65:0.18, borderRadius: i===0?"4px 0 0 4px":i===4?"0 4px 4px 0":"0" }} />))}
+                      {vzones.map((z, i) => (<div key={i} style={{ flex: 1, background: z.color, opacity: i===activeV ? 0.75 : i < activeV ? 0.35 : 0.15, borderRadius: i===0?"4px 0 0 4px":i===4?"0 4px 4px 0":"0" }} />))}
                       <div style={{ position: "absolute", top: -2, left: "calc("+pct+"% - 4px)", width: 8, height: 10, borderRadius: 2, background: valuation.color, boxShadow: "0 1px 3px rgba(0,0,0,0.3)", transition: "left 0.6s ease" }} />
                     </div>
                     <div style={{ display: "flex" }}>
