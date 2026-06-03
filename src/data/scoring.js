@@ -1,15 +1,17 @@
 // ── Scoring functions ──────────────────────────────────────────────
+// Negative score = bullish, Positive score = bearish
 
 export const WEIGHTS = { mvrv: 3, powerLaw: 3, puell: 2, lth: 2, nupl: 2, reserveRisk: 2 };
 
-export function scoreMVRV(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 1.0) return w; if (n > 6) return -w; return 0; }
-export function scorePowerLaw(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 20) return w; if (n > 75) return -w; return 0; }
-export function scorePuell(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 0.5) return w; if (n > 4) return -w; return 0; }
-export function scoreLTH(v, w) { if (v === "Accumulating") return w; if (v === "Dumping") return -w; return 0; }
-export function scoreNUPL(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 0.1) return w; if (n > 0.6) return -w; return 0; }
-export function scoreReserveRisk(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 0.0026) return w; if (n > 0.006) return -w; return 0; }
+export function scoreMVRV(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 1.5) return -w; if (n > 6) return w; return 0; }
+export function scorePowerLaw(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 25) return -w; if (n > 75) return w; return 0; }
+export function scorePuell(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 1.0) return -w; if (n > 4) return w; return 0; }
+export function scoreLTH(v, w) { if (v === "Accumulating") return -w; if (v === "Dumping") return w; return 0; }
+export function scoreNUPL(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 0.25) return -w; if (n > 0.6) return w; return 0; }
+export function scoreReserveRisk(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 0.0026) return -w; if (n > 0.006) return w; return 0; }
 
 // ── Market Outlook ─────────────────────────────────────────────────
+// score <= -10 = most bullish, score >= +10 = most bearish
 
 export function getMarketOutlook(score) {
   if (score <= -10) return {
@@ -24,13 +26,13 @@ export function getMarketOutlook(score) {
     color: "#4A7C5A", bg: "#F4F9F5", border: "#A0C8AD",
     badge: { bg: "#4A7C5A", text: "#FAF8F5" }, level: 1
   };
-  if (score <= 4) return {
+  if (score <= 2) return {
     label: "Fair Value",
     body: "The indicators aren't sending a strong signal in either direction right now. Bitcoin appears to be trading around fair value — there's no obvious reason to rush in or pull back. Patience is the right posture here.",
     color: "#4A4845", bg: "#F5F3EF", border: "#C8C4BC",
     badge: { bg: "#4A4845", text: "#FAF8F5" }, level: 2
   };
-  if (score <= 10) return {
+  if (score <= 8) return {
     label: "Overvalued",
     body: "A number of the indicators you're tracking are starting to flash late-cycle signals. Bitcoin may well go higher from here, but the risk of adding fresh capital at these levels has increased meaningfully.",
     color: "#8B6914", bg: "#FCF9F0", border: "#D4BC7A",
@@ -59,13 +61,13 @@ export function getBtcStrategy(score) {
     reason: "You don't need to rush, but you do want to keep adding consistently. A disciplined DCA approach works well here — it keeps you building through the accumulation zone without trying to time a precise bottom. Missing this window by waiting for things to get cheaper is a risk in itself.",
     color: "#2D5A3D", bg: "#F2F8F4", border: "#8FBD9E"
   };
-  if (score <= 4) return {
+  if (score <= 2) return {
     action: "Hold Steady",
     confidence: "Medium",
     reason: "There's no compelling signal to act in either direction right now. Your existing position is well-placed — you may want to consider staying the course and letting it work rather than adding aggressively or reducing prematurely. A clearer opportunity will come.",
     color: "#4A4845", bg: "#F5F3EF", border: "#C8C4BC"
   };
-  if (score <= 10) return {
+  if (score <= 8) return {
     action: "Stop Accumulating",
     confidence: "High",
     reason: "The risk-reward of adding fresh capital at these levels has shifted. You may want to consider holding what you have and avoiding new purchases for now. This is also a good moment to look at your loan structure — strengthening it while conditions are still relatively comfortable gives you more flexibility if the market turns.",
@@ -79,7 +81,7 @@ export function getBtcStrategy(score) {
   };
 }
 
-// ── Loan Strategy — unchanged ──────────────────────────────────────
+// ── Loan Strategy ──────────────────────────────────────────────────
 
 export function getLoanStrategy(portfolioLtv, maxLtv) {
   const dominant = Math.max(portfolioLtv, maxLtv);
