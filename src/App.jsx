@@ -710,8 +710,8 @@ export default function App() {
                   <div style={{ marginTop: 14, paddingTop: 12, borderTop: "0.5px solid #EBEBEB" }}>
                     <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>Yesterday</div>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                      <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 28, fontWeight: 600, color: fearGreed.prev >= 75 ? "#7B2D2D" : fearGreed.prev >= 55 ? "#8B6914" : fearGreed.prev >= 45 ? "#4A4845" : fearGreed.prev >= 25 ? "#4A7C5A" : "#2D5A3D", letterSpacing: "-0.02em", opacity: 0.5 }}>{fearGreed.prev}</span>
-                      <span style={{ fontSize: 13, color: "#888", fontWeight: 400 }}>{fearGreed.prevLabel}</span>
+                      <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 22, fontWeight: 400, color: fearGreed.prev >= 75 ? "#7B2D2D" : fearGreed.prev >= 55 ? "#8B6914" : fearGreed.prev >= 45 ? "#4A4845" : fearGreed.prev >= 25 ? "#4A7C5A" : "#2D5A3D", letterSpacing: "-0.02em", opacity: 0.6 }}>{fearGreed.prev}</span>
+                      <span style={{ fontSize: 12, color: "#AAA", fontWeight: 400 }}>{fearGreed.prevLabel}</span>
                     </div>
                   </div>
                 </div>
