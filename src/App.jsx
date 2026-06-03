@@ -694,8 +694,8 @@ export default function App() {
                     <div>
                       <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>Today</div>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                        <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, color: fearGreed.value >= 75 ? "#7B2D2D" : fearGreed.value >= 55 ? "#8B6914" : fearGreed.value >= 45 ? "#4A4845" : fearGreed.value >= 25 ? "#4A7C5A" : "#2D5A3D", letterSpacing: "-0.02em" }}>{fearGreed.value}</span>
-                        <span style={{ fontSize: 13, color: "#555", fontWeight: 500 }}>{fearGreed.label}</span>
+                        <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, fontWeight: 700, color: fearGreed.value >= 75 ? "#7B2D2D" : fearGreed.value >= 55 ? "#8B6914" : fearGreed.value >= 45 ? "#4A4845" : fearGreed.value >= 25 ? "#4A7C5A" : "#2D5A3D", letterSpacing: "-0.02em" }}>{fearGreed.value}</span>
+                        <span style={{ fontSize: 13, color: "#555", fontWeight: 600 }}>{fearGreed.label}</span>
                       </div>
                     </div>
                   </div>
@@ -710,8 +710,8 @@ export default function App() {
                   <div style={{ marginTop: 14, paddingTop: 12, borderTop: "0.5px solid #EBEBEB" }}>
                     <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>Yesterday</div>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                      <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, color: fearGreed.prev >= 75 ? "#7B2D2D" : fearGreed.prev >= 55 ? "#8B6914" : fearGreed.prev >= 45 ? "#4A4845" : fearGreed.prev >= 25 ? "#4A7C5A" : "#2D5A3D", letterSpacing: "-0.02em" }}>{fearGreed.prev}</span>
-                      <span style={{ fontSize: 13, color: "#555", fontWeight: 500 }}>{fearGreed.prevLabel}</span>
+                      <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, fontWeight: 400, color: fearGreed.prev >= 75 ? "#7B2D2D" : fearGreed.prev >= 55 ? "#8B6914" : fearGreed.prev >= 45 ? "#4A4845" : fearGreed.prev >= 25 ? "#4A7C5A" : "#2D5A3D", letterSpacing: "-0.02em" }}>{fearGreed.prev}</span>
+                      <span style={{ fontSize: 13, color: "#555", fontWeight: 400 }}>{fearGreed.prevLabel}</span>
                     </div>
                   </div>
                 </div>
