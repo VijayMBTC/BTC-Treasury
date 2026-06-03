@@ -698,18 +698,21 @@ export default function App() {
                         <span style={{ fontSize: 13, color: "#555", fontWeight: 500 }}>{fearGreed.label}</span>
                       </div>
                     </div>
-                    <div style={{ width: 120 }}>
-                      <div style={{ height: 6, borderRadius: 3, background: "linear-gradient(to right, #2D5A3D, #4A7C5A, #9A9590, #C88A1A, #A83030)", position: "relative", marginBottom: 4 }}>
-                        <div style={{ position: "absolute", top: "50%", left: fearGreed.value + "%", transform: "translate(-50%, -50%)", width: 10, height: 10, borderRadius: "50%", background: "#fff", border: "2px solid #1A1816", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#CCC" }}>
-                        <span>Fear</span><span>Greed</span>
-                      </div>
+                  </div>
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ height: 6, borderRadius: 3, background: "linear-gradient(to right, #7B2D2D, #8B6914, #9A9590, #4A7C5A, #2D5A3D)", position: "relative", marginBottom: 6 }}>
+                      <div style={{ position: "absolute", top: "50%", left: fearGreed.value + "%", transform: "translate(-50%, -50%)", width: 10, height: 10, borderRadius: "50%", background: "#fff", border: "2px solid #1A1816", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#B0ACA4" }}>
+                      <span>Extreme Fear</span><span>Fear</span><span>Neutral</span><span>Greed</span><span>Extreme Greed</span>
                     </div>
                   </div>
-                  <div className="ind-row">
-                    <span style={{ fontSize: 13, color: "#888" }}>Yesterday</span>
-                    <span style={{ fontSize: 13, color: "#555" }}>{fearGreed.prev} — {fearGreed.prevLabel}</span>
+                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: "0.5px solid #EBEBEB" }}>
+                    <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>Yesterday</div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                      <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: fearGreed.prev >= 75 ? "#7B2D2D" : fearGreed.prev >= 55 ? "#8B6914" : fearGreed.prev >= 45 ? "#4A4845" : fearGreed.prev >= 25 ? "#4A7C5A" : "#2D5A3D", letterSpacing: "-0.02em" }}>{fearGreed.prev}</span>
+                      <span style={{ fontSize: 13, color: "#555" }}>{fearGreed.prevLabel}</span>
+                    </div>
                   </div>
                 </div>
               ) : (
