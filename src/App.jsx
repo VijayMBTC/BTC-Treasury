@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
+import { WEIGHTS, scoreMVRV, scorePowerLaw, scorePuell, score200wSMA, scoreLTH, scoreNUPL, scoreReserveRisk, getMarketOutlook, getBtcStrategy, getLoanStrategy } from "./data/scoring.js";
 
-const STORAGE_KEY = "btc-treasury-v1";
-const WEIGHTS = { mvrv: 3, powerLaw: 3, sma200w: 2, puell: 2, lth: 1, rsi: 1 };
+const STORAGE_KEY = "btc-treasury-v2";
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Serif+Display:ital@0;1&display=swap');`;
 
 const DEFAULT_LOANS = [
@@ -9,8 +9,8 @@ const DEFAULT_LOANS = [
   { id: 2, lender: "Ledn", debt: 45000, collateral: 1.2 },
   { id: 3, lender: "Lava", debt: 80000, collateral: 2.1 },
 ];
-const DEFAULT_MANUAL = { mvrv: 0.26, puell: 1.1, lthTrend: "Accumulating" };
-const DEFAULT_TIMESTAMPS = { mvrv: null, puell: null, lthTrend: null };
+const DEFAULT_MANUAL = { mvrv: 0.58, puell: 0.79, lthTrend: "Accumulating", powerLaw: 4.4, nupl: 0.18, reserveRisk: 0.00115 };
+const DEFAULT_TIMESTAMPS = { mvrv: null, puell: null, lthTrend: null, powerLaw: null, nupl: null, reserveRisk: null };
 
 function daysSince(iso) {
   if (!iso) return null;
@@ -24,13 +24,6 @@ function staleness(iso) {
   if (d <= 7) return { label: d + "d ago", color: "#8B6914", dot: "#C8963A" };
   return { label: d + "d ago — update recommended", color: "#C0392B", dot: "#C0392B" };
 }
-
-function scoreMVRV(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 1.0) return w; if (n > 6) return -w; return 0; }
-function scorePowerLaw(v, w) { if (v === "Floor") return w; if (v === "Top") return -w; return 0; }
-function scorePuell(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 0.5) return w; if (n > 4) return -w; return 0; }
-function score200wSMA(price, sma, w) { if (!price || !sma) return 0; if (price <= sma) return w; if (price >= sma * 2.5) return -w; return 0; }
-function scoreLTH(v, w) { if (v === "Accumulating") return w; if (v === "Dumping") return -w; return 0; }
-function scoreRSI(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 30) return w; if (n > 85) return -w; return 0; }
 
 function calcPowerLawPrice(date) {
   const genesis = new Date("2009-01-03");
@@ -49,73 +42,6 @@ function calcRSI(closes, period = 14) {
   return 100 - 100 / (1 + avgGain / avgLoss);
 }
 
-// MARKET OUTLOOK — personal, plain-spoken tone
-function getMarketOutlook(score) {
-  if (score <= -6) return {
-    label: "Generational Opportunity",
-    body: "Several key indicators are at levels rarely seen outside major cycle lows. Historically, conditions like these have been among the best times to build a Bitcoin position.",
-    color: "#2D5A3D", bg: "#F2F8F4", border: "#8FBD9E",
-    badge: { bg: "#2D5A3D", text: "#FAF8F5" }, level: 0
-  };
-  if (score <= 0) return {
-    label: "Accumulation Zone",
-    body: "Bitcoin looks undervalued relative to where it has historically traded. In past cycles, periods like this have tended to reward patient buyers.",
-    color: "#4A7C5A", bg: "#F4F9F5", border: "#A0C8AD",
-    badge: { bg: "#4A7C5A", text: "#FAF8F5" }, level: 1
-  };
-  if (score <= 4) return {
-    label: "Fair Value",
-    body: "The indicators aren't sending a strong signal in either direction. Bitcoin appears to be trading around fair value — no obvious reason to rush in or pull back.",
-    color: "#4A4845", bg: "#F5F3EF", border: "#C8C4BC",
-    badge: { bg: "#4A4845", text: "#FAF8F5" }, level: 2
-  };
-  if (score <= 8) return {
-    label: "Overvalued",
-    body: "A number of indicators are flashing late-cycle warning signs. Bitcoin may still go higher, but the risk of buying at these levels is meaningfully elevated.",
-    color: "#8B6914", bg: "#FCF9F0", border: "#D4BC7A",
-    badge: { bg: "#8B6914", text: "#FAF8F5" }, level: 3
-  };
-  return {
-    label: "Euphoria",
-    body: "Multiple indicators are at extreme levels not often seen outside cycle tops. Conditions like these have historically been followed by significant price corrections.",
-    color: "#7B2D2D", bg: "#FDF4F4", border: "#D4A8A8",
-    badge: { bg: "#7B2D2D", text: "#FAF8F5" }, level: 4
-  };
-}
-
-// BTC STRATEGY
-function getBtcStrategy(valuationLevel, riskLevel) {
-  if (riskLevel >= 3) return { action: "Preserve Capital", confidence: "High", reason: "Your loan position needs attention before anything else. Until your LTV is back in a safe range, adding to your Bitcoin position increases the risk to collateral you already hold.", color: "#7B2D2D", bg: "#FBF2F2", border: "#D4A8A8" };
-  if (valuationLevel === 0) {
-    if (riskLevel <= 1) return { action: "Buy Aggressively", confidence: "High", reason: "Your indicators are aligned in a way that has rarely been seen outside major cycle lows, and your loan structure is in good shape. This is the kind of window that long-term Bitcoin holders position themselves for.", color: "#1A5C38", bg: "#EDF7F2", border: "#7DC4A0" };
-    return { action: "Accumulate", confidence: "Medium", reason: "Bitcoin looks very attractive at these levels, but your current loan exposure means you should be measured rather than aggressive. Keep adding steadily, but don't stretch your collateral buffer to do it.", color: "#2D5A3D", bg: "#F2F8F4", border: "#8FBD9E" };
-  }
-  if (valuationLevel === 1) {
-    if (riskLevel <= 1) return { action: "Accumulate", confidence: "High", reason: "Bitcoin is trading below where the indicators suggest it should be, and your loan structure is healthy. This is a straightforward case for continuing to build your position.", color: "#2D5A3D", bg: "#F2F8F4", border: "#8FBD9E" };
-    return { action: "Accumulate Steadily", confidence: "Medium", reason: "The value case for Bitcoin is solid here, but your loan levels mean you should keep a consistent, measured pace. Avoid deploying a large amount at once while your LTV is elevated.", color: "#4A7C5A", bg: "#F4F9F5", border: "#A0C8AD" };
-  }
-  if (valuationLevel === 2) {
-    if (riskLevel <= 1) return { action: "Hold", confidence: "Medium", reason: "There's no strong signal to act in either direction right now. Your position is well-structured, so the sensible move is to hold and wait for a clearer opportunity.", color: "#4A4845", bg: "#F5F3EF", border: "#C8C4BC" };
-    return { action: "Hold — Strengthen Structure", confidence: "Medium", reason: "Bitcoin isn't obviously cheap or expensive right now, but your loan levels are the bigger variable. Any spare capital is better used reducing debt than adding to your position at this stage.", color: "#7A6830", bg: "#FAF7EE", border: "#CFC090" };
-  }
-  if (valuationLevel === 3) {
-    if (riskLevel === 0) return { action: "Hold — Reduce Leverage", confidence: "Medium", reason: "The market is looking stretched, but your treasury is in a strong position. This is a good time to reduce your loan exposure while you can do it on your own terms, without any urgency.", color: "#8B6914", bg: "#FBF8EF", border: "#D4BC7A" };
-    return { action: "Pause Accumulation", confidence: "High", reason: "Bitcoin is looking expensive and your loan levels are elevated. Adding more right now compounds your risk on both sides. Pause buying and focus on bringing your LTV down.", color: "#8B6914", bg: "#FBF8EF", border: "#D4BC7A" };
-  }
-  if (riskLevel === 0) return { action: "Consider Trimming", confidence: "Medium", reason: "The market is showing the kind of extreme readings that have historically appeared near cycle tops. Your treasury is in excellent shape, so you may want to consider taking some off the table while conditions are strong.", color: "#7B2D2D", bg: "#FBF2F2", border: "#D4A8A8" };
-  return { action: "Reduce Exposure", confidence: "High", reason: "The market looks very stretched and your loan levels are a concern. This combination increases your downside exposure significantly. Reducing debt and trimming your position would put you in a much stronger position.", color: "#7B2D2D", bg: "#FBF2F2", border: "#D4A8A8" };
-}
-
-// LOAN STRATEGY — "Opportunity to Optimise Collateral" replaces "Collateral Efficiency Opportunity"
-function getLoanStrategy(portfolioLtv, maxLtv) {
-  const dominant = Math.max(portfolioLtv, maxLtv);
-  if (dominant >= 0.50) return { label: "Danger Zone", action: "Immediate Attention Required", situation: "Your portfolio LTV has entered the danger threshold.", why: "A modest further decline in BTC price could trigger forced liquidation by your lender, resulting in loss of collateral.", what: "Prioritise debt reduction or add collateral immediately. This takes precedence over any accumulation activity.", color: "#7B2D2D", bg: "#FDF4F4", border: "#D4A8A8", badge: { bg: "#7B2D2D", text: "#FAF8F5" }, level: 4 };
-  if (dominant >= 0.40) return { label: "Elevated Risk", action: "Reduce Risk", situation: "Collateral coverage is thinning as LTV approaches the danger zone.", why: "A 20-25% decline in BTC price from here would push your position into dangerous territory. The margin for error is narrow.", what: "Consider paying down the highest-LTV loan or adding collateral to create a more comfortable buffer before deploying further capital.", color: "#8B6914", bg: "#FBF8EF", border: "#D4BC7A", badge: { bg: "#8B6914", text: "#FAF8F5" }, level: 3 };
-  if (dominant >= 0.30) return { label: "Moderate Risk", action: "Monitor Closely", situation: "Leverage is within acceptable bounds but deserves attention.", why: "Your collateral structure can absorb moderate price weakness, but a sustained drawdown would erode your buffer meaningfully.", what: "No immediate intervention required. Review if BTC declines more than 15-20% from current levels.", color: "#7A6830", bg: "#FAF7EE", border: "#CFC090", badge: { bg: "#7A6830", text: "#FAF8F5" }, level: 2 };
-  if (dominant >= 0.20) return { label: "Safe", action: "Maintain Structure", situation: "Debt and collateral levels are well-balanced.", why: "Your current LTV provides a healthy buffer against price volatility. The portfolio is structured conservatively.", what: "No action required. Continue your existing strategy and review when market conditions or loan balances change materially.", color: "#2D5A3D", bg: "#F2F8F4", border: "#8FBD9E", badge: { bg: "#2D5A3D", text: "#FAF8F5" }, level: 1 };
-  return { label: "Very Safe", action: "Opportunity to Optimise Collateral", situation: "Portfolio leverage is substantially below optimal levels.", why: "You are holding more collateral than your current debt requires. This capital could be working harder within a still-conservative risk profile.", what: "You may be able to safely release collateral or increase debt capacity while remaining well within safe LTV thresholds.", color: "#1E3F5A", bg: "#F2F6FA", border: "#8AAEC8", badge: { bg: "#1E3F5A", text: "#FAF8F5" }, level: 0 };
-}
-
 function fmt(n, decimals = 2) { if (n === null || n === undefined || isNaN(n)) return "—"; return Number(n).toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }); }
 function fmtPct(n) { if (n === null || n === undefined || isNaN(n)) return "—"; return (n * 100).toFixed(1) + "%"; }
 function fmtUSD(n) { if (!n) return "—"; return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
@@ -126,7 +52,6 @@ export default function App() {
   const [sma200w, setSma200w] = useState(null);
   const [weeklyRsi, setWeeklyRsi] = useState(null);
   const [powerLawPrice, setPowerLawPrice] = useState(null);
-  const [powerLawPos, setPowerLawPos] = useState("Mid");
   const [lastUpdated, setLastUpdated] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
@@ -160,7 +85,7 @@ export default function App() {
   useEffect(() => {
     if (!dataLoaded) return;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ loans, manual, nextId, scoreHistory, manualTimestamps })); } catch (e) {}
-  }, [loans, manual, nextId, scoreHistory, dataLoaded]);
+  }, [loans, manual, nextId, scoreHistory, manualTimestamps, dataLoaded]);
 
   useEffect(() => {
     async function fetchData() {
@@ -179,29 +104,18 @@ export default function App() {
         const weeklyCloses = [];
         for (let i = 6; i < closes.length; i += 7) weeklyCloses.push(closes[i]);
         setWeeklyRsi(calcRSI(weeklyCloses, 14));
-        const plPrice = calcPowerLawPrice(new Date());
-        setPowerLawPrice(plPrice);
-        const ratio = latestPrice / plPrice;
-        if (ratio < 0.8) setPowerLawPos("Floor");
-        else if (ratio > 3.5) setPowerLawPos("Top");
-        else setPowerLawPos("Mid");
+        setPowerLawPrice(calcPowerLawPrice(new Date()));
         setLastUpdated(new Date());
       } catch (e) { setFetchError(true); }
       setLoading(false);
     }
     fetchData();
-
     async function fetchFearGreed() {
       try {
         const res = await fetch("/api/fear-greed");
         const data = await res.json();
         if (data && data.data && data.data.length >= 2) {
-          setFearGreed({
-            value: parseInt(data.data[0].value),
-            label: data.data[0].value_classification,
-            prev: parseInt(data.data[1].value),
-            prevLabel: data.data[1].value_classification,
-          });
+          setFearGreed({ value: parseInt(data.data[0].value), label: data.data[0].value_classification, prev: parseInt(data.data[1].value), prevLabel: data.data[1].value_classification });
         }
       } catch (e) {}
     }
@@ -210,11 +124,12 @@ export default function App() {
 
   const scores = {
     mvrv: scoreMVRV(manual.mvrv, WEIGHTS.mvrv),
-    powerLaw: scorePowerLaw(powerLawPos, WEIGHTS.powerLaw),
+    powerLaw: scorePowerLaw(manual.powerLaw, WEIGHTS.powerLaw),
     puell: scorePuell(manual.puell, WEIGHTS.puell),
     sma200w: score200wSMA(btcPrice, sma200w, WEIGHTS.sma200w),
     lth: scoreLTH(manual.lthTrend, WEIGHTS.lth),
-    rsi: scoreRSI(weeklyRsi, WEIGHTS.rsi),
+    nupl: scoreNUPL(manual.nupl, WEIGHTS.nupl),
+    reserveRisk: scoreReserveRisk(manual.reserveRisk, WEIGHTS.reserveRisk),
   };
   const totalScore = Object.values(scores).reduce((a, b) => a + b, 0);
 
@@ -227,18 +142,9 @@ export default function App() {
 
   const marketOutlook = getMarketOutlook(totalScore);
   const loanStrategy = getLoanStrategy(portfolioLtv, maxLtv);
-  const btcStrategy = getBtcStrategy(marketOutlook.level, loanStrategy.level);
+  const btcStrategy = getBtcStrategy(totalScore);
 
   const distFromATH = btcPrice && athPrice ? ((btcPrice - athPrice) / athPrice) : null;
-
-  const indicators = [
-    { label: "MVRV Z-Score", value: manual.mvrv || "—", score: scores.mvrv, auto: false },
-    { label: "Power Law", value: powerLawPos, score: scores.powerLaw, auto: true },
-    { label: "200W SMA", value: sma200w ? fmtUSD(Math.round(sma200w)) : "—", score: scores.sma200w, auto: true },
-    { label: "Puell Multiple", value: manual.puell || "—", score: scores.puell, auto: false },
-    { label: "LTH Supply Trend", value: manual.lthTrend, score: scores.lth, auto: false },
-    { label: "Weekly RSI", value: weeklyRsi ? weeklyRsi.toFixed(1) : "—", score: scores.rsi, auto: true },
-  ];
 
   useEffect(() => {
     if (!btcPrice || !dataLoaded) return;
@@ -258,9 +164,13 @@ export default function App() {
     setLoans(loans.map((l) => l.id === editingLoan.id ? { ...editingLoan, debt: parseFloat(editingLoan.debt), collateral: parseFloat(editingLoan.collateral) } : l));
     setEditingLoan(null);
   }
+  function handleManual(key, value) {
+    setManual(prev => ({ ...prev, [key]: value }));
+    setManualTimestamps(prev => ({ ...prev, [key]: new Date().toISOString() }));
+  }
+
   const ltvBarColor = (ltv) => { if (ltv >= 0.5) return "#7B2D2D"; if (ltv >= 0.35) return "#8B6914"; return "#2D5A3D"; };
 
-  // Scale zones
   const vzones = [
     { label: "Generational\nOpportunity", color: "#1A7A4A" },
     { label: "Accumulation\nZone", color: "#5BA55A" },
@@ -281,7 +191,6 @@ export default function App() {
   const rPct = Math.max(2, Math.min(98, portfolioLtv * 160));
   const activeR = loanStrategy.level;
 
-  // Section heading — no numbers
   const SectionHeading = ({ title }) => (
     <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: 2, marginBottom: 4 }}>
       <span style={{ fontSize: 12, color: "#1A1816", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>{title}</span>
@@ -289,50 +198,82 @@ export default function App() {
     </div>
   );
 
-  // Embedded scale — marker sits inside the track
   const ScaleBar = ({ zones, activePct, activeIdx, markerColor }) => (
     <div>
       <div style={{ position: "relative", height: 10, borderRadius: 5, overflow: "hidden", marginBottom: 10 }}>
-        {/* colored segments */}
         <div style={{ display: "flex", width: "100%", height: "100%" }}>
           {zones.map((z, i) => (
-            <div key={i} style={{
-              flex: 1, background: z.color,
-              opacity: i === activeIdx ? 0.85 : i < activeIdx ? 0.40 : 0.18,
-              borderRadius: i === 0 ? "5px 0 0 5px" : i === zones.length - 1 ? "0 5px 5px 0" : "0"
-            }} />
+            <div key={i} style={{ flex: 1, background: z.color, opacity: i === activeIdx ? 0.85 : i < activeIdx ? 0.40 : 0.18, borderRadius: i === 0 ? "5px 0 0 5px" : i === zones.length - 1 ? "0 5px 5px 0" : "0" }} />
           ))}
         </div>
-        {/* Embedded marker — white-center dot sitting inside the track */}
-        <div style={{
-          position: "absolute",
-          top: "50%",
-          left: activePct + "%",
-          transform: "translate(-50%, -50%)",
-          width: 12, height: 12,
-          borderRadius: "50%",
-          background: "#FFFFFF",
-          border: "2.5px solid " + (markerColor || "#1A1816"),
-          boxShadow: "0 0 0 1.5px rgba(0,0,0,0.15)",
-          zIndex: 4,
-          transition: "left 0.6s ease"
-        }} />
+        <div style={{ position: "absolute", top: "50%", left: activePct + "%", transform: "translate(-50%, -50%)", width: 12, height: 12, borderRadius: "50%", background: "#FFFFFF", border: "2.5px solid " + (markerColor || "#1A1816"), boxShadow: "0 0 0 1.5px rgba(0,0,0,0.15)", zIndex: 4, transition: "left 0.6s ease" }} />
       </div>
       <div style={{ display: "flex" }}>
         {zones.map((z, i) => (
-          <div key={i} style={{
-            flex: 1,
-            textAlign: i === 0 ? "left" : i === zones.length - 1 ? "right" : "center",
-            fontSize: i === activeIdx ? 10 : 9,
-            color: i === activeIdx ? z.color : "#B0ACA4",
-            fontWeight: i === activeIdx ? 700 : 400,
-            lineHeight: 1.3,
-            whiteSpace: "pre-line",
-          }}>{z.label}</div>
+          <div key={i} style={{ flex: 1, textAlign: i === 0 ? "left" : i === zones.length - 1 ? "right" : "center", fontSize: i === activeIdx ? 10 : 9, color: i === activeIdx ? z.color : "#B0ACA4", fontWeight: i === activeIdx ? 700 : 400, lineHeight: 1.3, whiteSpace: "pre-line" }}>{z.label}</div>
         ))}
       </div>
     </div>
   );
+
+  // ── Indicator gauge bar ───────────────────────────────────────────
+  const GaugeBar = ({ pct, color }) => (
+    <div style={{ position: "relative", height: 10, borderRadius: 5, background: "#EAE8E3", overflow: "visible", margin: "8px 0 4px" }}>
+      <div style={{ position: "absolute", top: -4, left: `calc(${Math.max(2, Math.min(98, pct))}% - 1.5px)`, width: 3, height: 18, background: color, borderRadius: 2, zIndex: 2 }} />
+      <div style={{ height: "100%", width: Math.max(2, Math.min(100, pct)) + "%", background: color, opacity: 0.25, borderRadius: 5 }} />
+    </div>
+  );
+
+  const indConfig = [
+    {
+      key: "mvrv", label: "MVRV Z-Score", manual: true,
+      value: manual.mvrv, score: scores.mvrv,
+      pct: Math.max(2, Math.min(98, (parseFloat(manual.mvrv) / 10) * 100)),
+      color: scores.mvrv > 0 ? "#2D5A3D" : scores.mvrv < 0 ? "#7B2D2D" : "#8B6914",
+      desc: "Compares market value to realised value. Below 1 = undervalued. Above 6 = overheated.",
+      zones: "Bullish < 1.0 · Neutral 1–6 · Bearish > 6.0", type: "number", step: "0.01"
+    },
+    {
+      key: "powerLaw", label: "Power Law Oscillator", manual: true,
+      value: manual.powerLaw, score: scores.powerLaw,
+      pct: Math.max(2, Math.min(98, parseFloat(manual.powerLaw) || 0)),
+      color: scores.powerLaw > 0 ? "#2D5A3D" : scores.powerLaw < 0 ? "#7B2D2D" : "#8B6914",
+      desc: "Position within the long-term Power Law corridor (0–100 scale). Below 20 = deep value. Above 75 = overheated.",
+      zones: "Bullish < 20 · Neutral 20–75 · Bearish > 75", type: "number", step: "0.1"
+    },
+    {
+      key: "puell", label: "Puell Multiple", manual: true,
+      value: manual.puell, score: scores.puell,
+      pct: Math.max(2, Math.min(98, (parseFloat(manual.puell) / 6) * 100)),
+      color: scores.puell > 0 ? "#2D5A3D" : scores.puell < 0 ? "#7B2D2D" : "#8B6914",
+      desc: "Miner daily revenue vs 365-day average. Low = miners under stress, less sell pressure. High = miners flush, more sell pressure.",
+      zones: "Bullish < 0.5 · Neutral 0.5–4 · Bearish > 4.0", type: "number", step: "0.01"
+    },
+    {
+      key: "lthTrend", label: "LTH Supply Trend", manual: true,
+      value: manual.lthTrend, score: scores.lth,
+      pct: manual.lthTrend === "Accumulating" ? 15 : manual.lthTrend === "Dumping" ? 85 : 50,
+      color: scores.lth > 0 ? "#2D5A3D" : scores.lth < 0 ? "#7B2D2D" : "#8B6914",
+      desc: "Are long-term holders (155+ days) accumulating or distributing? Accumulation = smart money buying. Distribution = smart money selling.",
+      zones: "Bullish: Accumulating · Neutral · Bearish: Dumping", type: "select"
+    },
+    {
+      key: "nupl", label: "NUPL", manual: true,
+      value: manual.nupl, score: scores.nupl,
+      pct: Math.max(2, Math.min(98, ((parseFloat(manual.nupl) + 0.2) / 1.2) * 100)),
+      color: scores.nupl > 0 ? "#2D5A3D" : scores.nupl < 0 ? "#7B2D2D" : "#8B6914",
+      desc: "Net Unrealised Profit/Loss — aggregate paper gain or loss across all wallets. Below 0.1 = fear/capitulation. Above 0.6 = euphoria.",
+      zones: "Bullish < 0.1 · Hope/Fear 0.1–0.6 · Bearish > 0.6", type: "number", step: "0.01"
+    },
+    {
+      key: "reserveRisk", label: "Reserve Risk", manual: true,
+      value: manual.reserveRisk, score: scores.reserveRisk,
+      pct: Math.max(2, Math.min(98, (parseFloat(manual.reserveRisk) / 0.01) * 100)),
+      color: scores.reserveRisk > 0 ? "#2D5A3D" : scores.reserveRisk < 0 ? "#7B2D2D" : "#8B6914",
+      desc: "Price divided by the HODL Bank — measures conviction of long-term holders vs incentive to sell. Below 0.0026 = attractive risk/reward.",
+      zones: "Bullish < 0.0026 · Neutral 0.0026–0.006 · Bearish > 0.006", type: "number", step: "0.00001"
+    },
+  ];
 
   return (
     <div style={{ fontFamily: "'DM Sans', sans-serif", minHeight: "100vh", background: "#F5F3EF", color: "#141412" }}>
@@ -343,9 +284,6 @@ export default function App() {
         .tab-btn { background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 8px 16px; border-radius: 6px; color: #888; letter-spacing: 0.04em; transition: all 0.15s; }
         .tab-btn.active { background: #fff; color: #1C1C1A; font-weight: 500; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
         .tab-btn:hover:not(.active) { color: #444; }
-        .ind-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 0.5px solid #EBEBEB; }
-        .ind-row:last-child { border-bottom: none; }
-        .score-chip { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 22px; border-radius: 4px; font-size: 12px; font-weight: 500; }
         .metric-card { background: #fff; border: 0.5px solid #E8E7E4; border-radius: 12px; padding: 18px 20px; }
         .btn-ghost { background: none; border: 0.5px solid #DDD; border-radius: 6px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 5px 12px; color: #666; transition: all 0.15s; }
         .btn-ghost:hover { border-color: #AAA; color: #333; }
@@ -359,6 +297,8 @@ export default function App() {
         @keyframes pulse { 0%,100%{opacity:1;}50%{opacity:0.5;} }
         .fade-in { animation: fadeIn 0.4s ease; }
         @keyframes fadeIn { from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);} }
+        .ind-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 0.5px solid #EBEBEB; }
+        .ind-row:last-child { border-bottom: none; }
       `}</style>
 
       {/* Header */}
@@ -383,7 +323,7 @@ export default function App() {
       <div style={{ background: "#F5F3EF", padding: "12px 24px 0", borderBottom: "0.5px solid #E2DFD8" }}>
         <div style={{ maxWidth: 820, margin: "0 auto" }}>
           <div style={{ display: "inline-flex", background: "#EAE8E3", borderRadius: 9, padding: 3, gap: 2 }}>
-            {["dashboard", "loans", "indicators", "history"].map((t) => (
+            {["dashboard", "indicators", "loans", "history"].map((t) => (
               <button key={t} className={`tab-btn${activeTab === t ? " active" : ""}`} onClick={() => setActiveTab(t)}>
                 {t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
@@ -398,10 +338,8 @@ export default function App() {
         {activeTab === "dashboard" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-            {/* ── 1. MARKET OUTLOOK ── */}
             <SectionHeading title="Market Outlook" />
-            <div style={{ background: marketOutlook.bg, border: "0.5px solid " + marketOutlook.border, borderLeft: "4px solid " + marketOutlook.color, borderRadius: 14, padding: "24px 26px 20px", boxShadow: "0 2px 8px " + marketOutlook.color + "10, 0 0.5px 2px rgba(20,18,14,0.04)" }}>
-              {/* Badge + Signal */}
+            <div style={{ background: marketOutlook.bg, border: "0.5px solid " + marketOutlook.border, borderLeft: "4px solid " + marketOutlook.color, borderRadius: 14, padding: "24px 26px 20px", boxShadow: "0 2px 8px " + marketOutlook.color + "10" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                 <span style={{ display: "inline-block", background: marketOutlook.badge.bg, color: marketOutlook.badge.text, fontSize: 11, fontWeight: 500, letterSpacing: "0.09em", textTransform: "uppercase", padding: "5px 12px", borderRadius: 5 }}>{marketOutlook.label}</span>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
@@ -409,42 +347,19 @@ export default function App() {
                   <span style={{ fontSize: 10, color: "#5A5855", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500 }}>Signal</span>
                 </div>
               </div>
-
-              {/* Concise body */}
-              <div style={{ fontSize: 14, color: "#2A2725", lineHeight: 1.65, marginBottom: 18, paddingBottom: 18, borderBottom: "0.5px solid " + marketOutlook.border }}>
-                {marketOutlook.body}
-              </div>
-
-              {/* Scale — embedded marker */}
-              <div style={{ marginBottom: 16 }}>
-                <ScaleBar zones={vzones} activePct={vPct} activeIdx={activeV} markerColor={marketOutlook.color} />
-              </div>
-
-              {/* ATH 3-column block */}
+              <div style={{ fontSize: 14, color: "#2A2725", lineHeight: 1.65, marginBottom: 18, paddingBottom: 18, borderBottom: "0.5px solid " + marketOutlook.border }}>{marketOutlook.body}</div>
+              <div style={{ marginBottom: 16 }}><ScaleBar zones={vzones} activePct={vPct} activeIdx={activeV} markerColor={marketOutlook.color} /></div>
               {btcPrice && athPrice && (
                 <div style={{ paddingTop: 14, borderTop: "0.5px solid " + marketOutlook.border, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                  <div>
-                    <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>BTC Price</div>
-                    <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 16, color: "#1A1816", letterSpacing: "-0.02em" }}>{fmtUSD(Math.round(btcPrice))}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>All-Time High</div>
-                    <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 16, color: "#1A1816", letterSpacing: "-0.02em" }}>{fmtUSD(Math.round(athPrice))}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>Distance from ATH</div>
-                    <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 16, color: distFromATH >= -0.1 ? "#2D5A3D" : distFromATH >= -0.3 ? "#8B6914" : "#7B2D2D", letterSpacing: "-0.02em" }}>
-                      {distFromATH >= 0 ? "At ATH" : (distFromATH * 100).toFixed(1) + "%"}
-                    </div>
-                  </div>
+                  <div><div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>BTC Price</div><div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 16, color: "#1A1816" }}>{fmtUSD(Math.round(btcPrice))}</div></div>
+                  <div><div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>All-Time High</div><div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 16, color: "#1A1816" }}>{fmtUSD(Math.round(athPrice))}</div></div>
+                  <div><div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>Distance from ATH</div><div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 16, color: distFromATH >= -0.1 ? "#2D5A3D" : distFromATH >= -0.3 ? "#8B6914" : "#7B2D2D" }}>{distFromATH >= 0 ? "At ATH" : (distFromATH * 100).toFixed(1) + "%"}</div></div>
                 </div>
               )}
             </div>
 
-            {/* ── 2. BTC STRATEGY ── */}
-            <div style={{ marginTop: 8 }}><SectionHeading title="BTC Strategy" /></div>
-            <div style={{ background: "#FEFDFB", border: "0.5px solid #D8D4CC", borderLeft: "5px solid " + btcStrategy.color, borderRadius: 16, padding: "28px 28px 24px", boxShadow: "0 2px 12px rgba(20,18,14,0.08), 0 1px 3px rgba(20,18,14,0.06)" }}>
-              {/* Action headline — ~15% larger */}
+            <div style={{ marginTop: 4 }}><SectionHeading title="BTC Strategy" /></div>
+            <div style={{ background: "#FEFDFB", border: "0.5px solid #D8D4CC", borderLeft: "5px solid " + btcStrategy.color, borderRadius: 16, padding: "28px 28px 24px", boxShadow: "0 2px 12px rgba(20,18,14,0.08)" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 18 }}>
                 <div>
                   <div style={{ fontSize: 10, color: btcStrategy.color, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>BTC Strategy</div>
@@ -460,23 +375,17 @@ export default function App() {
                   </div>
                 </div>
               </div>
-
-              {/* Rationale */}
-              <div style={{ fontSize: 14, color: "#2A2725", lineHeight: 1.7, paddingTop: 18, borderTop: "0.5px solid #E2DFD8", marginBottom: 18 }}>
-                {btcStrategy.reason}
-              </div>
-
-              {/* Based On — transparent inputs panel */}
+              <div style={{ fontSize: 14, color: "#2A2725", lineHeight: 1.7, paddingTop: 18, borderTop: "0.5px solid #E2DFD8", marginBottom: 18 }}>{btcStrategy.reason}</div>
               <div style={{ paddingTop: 16, borderTop: "0.5px solid #E2DFD8" }}>
-                <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600, marginBottom: 10 }}>Based On</div>
+                <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600, marginBottom: 10 }}>Context</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                   <div style={{ background: "#F5F3EF", borderRadius: 8, padding: "10px 14px", border: "0.5px solid #E2DFD8" }}>
-                    <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Market Outlook</div>
+                    <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Market Signal</div>
                     <div style={{ fontSize: 13, color: marketOutlook.color, fontWeight: 600 }}>{marketOutlook.label}</div>
-                    <div style={{ fontSize: 11, color: "#6B6760", marginTop: 2 }}>Signal {totalScore > 0 ? "+" : ""}{totalScore}</div>
+                    <div style={{ fontSize: 11, color: "#6B6760", marginTop: 2 }}>Score {totalScore > 0 ? "+" : ""}{totalScore}</div>
                   </div>
                   <div style={{ background: "#F5F3EF", borderRadius: 8, padding: "10px 14px", border: "0.5px solid #E2DFD8" }}>
-                    <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Treasury Risk</div>
+                    <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Loan Position</div>
                     <div style={{ fontSize: 13, color: loanStrategy.color, fontWeight: 600 }}>{loanStrategy.label}</div>
                     <div style={{ fontSize: 11, color: "#6B6760", marginTop: 2 }}>LTV {fmtPct(portfolioLtv)}</div>
                   </div>
@@ -484,10 +393,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* ── 3. LOAN STRATEGY ── */}
-            <div style={{ marginTop: 8 }}><SectionHeading title="Loan Strategy" /></div>
-            <div style={{ background: loanStrategy.bg, border: "0.5px solid " + loanStrategy.border, borderLeft: "4px solid " + loanStrategy.color, borderRadius: 14, padding: "24px 26px 20px", boxShadow: "0 2px 8px " + loanStrategy.color + "10, 0 0.5px 2px rgba(20,18,14,0.04)" }}>
-              {/* Badge + LTV — LTV enlarged ~20% */}
+            <div style={{ marginTop: 4 }}><SectionHeading title="Loan Strategy" /></div>
+            <div style={{ background: loanStrategy.bg, border: "0.5px solid " + loanStrategy.border, borderLeft: "4px solid " + loanStrategy.color, borderRadius: 14, padding: "24px 26px 20px", boxShadow: "0 2px 8px " + loanStrategy.color + "10" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                 <span style={{ display: "inline-block", background: loanStrategy.badge.bg, color: loanStrategy.badge.text, fontSize: 11, fontWeight: 500, letterSpacing: "0.09em", textTransform: "uppercase", padding: "5px 12px", borderRadius: 5 }}>{loanStrategy.label}</span>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
@@ -495,104 +402,127 @@ export default function App() {
                   <span style={{ fontSize: 10, color: "#5A5855", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500 }}>Portfolio LTV</span>
                 </div>
               </div>
-
-              {/* Advisory panel */}
               <div style={{ marginBottom: 18 }}>
                 <div style={{ background: loanStrategy.color + "08", border: "0.5px solid " + loanStrategy.border, borderRadius: 10, padding: "16px 18px" }}>
                   <div style={{ fontSize: 10, color: loanStrategy.color, letterSpacing: "0.09em", textTransform: "uppercase", fontWeight: 600, marginBottom: 6 }}>Advisory</div>
                   <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: loanStrategy.color, letterSpacing: "-0.01em", marginBottom: 14, lineHeight: 1.2 }}>{loanStrategy.action}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <div>
-                      <div style={{ fontSize: 10, color: "#5A5855", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>Situation</div>
-                      <div style={{ fontSize: 13, color: "#2A2825", lineHeight: 1.6 }}>{loanStrategy.situation}</div>
-                    </div>
-                    <div style={{ borderTop: "0.5px solid " + loanStrategy.border, paddingTop: 10 }}>
-                      <div style={{ fontSize: 10, color: "#5A5855", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>Why It Matters</div>
-                      <div style={{ fontSize: 13, color: "#2A2825", lineHeight: 1.6 }}>{loanStrategy.why}</div>
-                    </div>
-                    <div style={{ borderTop: "0.5px solid " + loanStrategy.border, paddingTop: 10 }}>
-                      <div style={{ fontSize: 10, color: "#5A5855", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>What to Consider</div>
-                      <div style={{ fontSize: 13, color: "#2A2825", lineHeight: 1.6 }}>{loanStrategy.what}</div>
-                    </div>
+                    <div><div style={{ fontSize: 10, color: "#5A5855", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>Situation</div><div style={{ fontSize: 13, color: "#2A2825", lineHeight: 1.6 }}>{loanStrategy.situation}</div></div>
+                    <div style={{ borderTop: "0.5px solid " + loanStrategy.border, paddingTop: 10 }}><div style={{ fontSize: 10, color: "#5A5855", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>Why It Matters</div><div style={{ fontSize: 13, color: "#2A2825", lineHeight: 1.6 }}>{loanStrategy.why}</div></div>
+                    <div style={{ borderTop: "0.5px solid " + loanStrategy.border, paddingTop: 10 }}><div style={{ fontSize: 10, color: "#5A5855", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>What to Consider</div><div style={{ fontSize: 13, color: "#2A2825", lineHeight: 1.6 }}>{loanStrategy.what}</div></div>
                   </div>
                 </div>
               </div>
-
-              {/* Risk scale — embedded marker */}
-              <div style={{ marginBottom: 18 }}>
-                <ScaleBar zones={rzones} activePct={rPct} activeIdx={activeR} markerColor={loanStrategy.color} />
-              </div>
-
-              {/* Based On — transparent inputs */}
-              <div style={{ marginBottom: 18, paddingBottom: 18, borderBottom: "0.5px solid " + loanStrategy.border }}>
-                <div style={{ fontSize: 10, color: "#5A5855", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600, marginBottom: 10 }}>Based On</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  <div style={{ background: loanStrategy.color + "08", borderRadius: 7, padding: "9px 12px", border: "0.5px solid " + loanStrategy.border }}>
-                    <div style={{ fontSize: 9, color: "#5A5855", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 2 }}>Portfolio LTV</div>
-                    <div style={{ fontSize: 14, color: loanStrategy.color, fontWeight: 600 }}>{fmtPct(portfolioLtv)}</div>
-                  </div>
-                  <div style={{ background: loanStrategy.color + "08", borderRadius: 7, padding: "9px 12px", border: "0.5px solid " + loanStrategy.border }}>
-                    <div style={{ fontSize: 9, color: "#5A5855", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 2 }}>Highest LTV</div>
-                    <div style={{ fontSize: 14, color: ltvBarColor(maxLtv), fontWeight: 600 }}>{fmtPct(maxLtv)}</div>
-                  </div>
-                  <div style={{ background: loanStrategy.color + "08", borderRadius: 7, padding: "9px 12px", border: "0.5px solid " + loanStrategy.border }}>
-                    <div style={{ fontSize: 9, color: "#5A5855", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 2 }}>Liq. Distance</div>
-                    <div style={{ fontSize: 14, color: liquidationDistance !== null && liquidationDistance < 0.3 ? "#7B2D2D" : loanStrategy.color, fontWeight: 600 }}>{liquidationDistance !== null ? (liquidationDistance * 100).toFixed(0) + "%" : "—"}</div>
-                  </div>
-                  <div style={{ background: loanStrategy.color + "08", borderRadius: 7, padding: "9px 12px", border: "0.5px solid " + loanStrategy.border }}>
-                    <div style={{ fontSize: 9, color: "#5A5855", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 2 }}>Total Debt</div>
-                    <div style={{ fontSize: 14, color: "#1A1816", fontWeight: 600 }}>{fmtUSD(totalDebt)}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom metrics row */}
+              <div style={{ marginBottom: 18 }}><ScaleBar zones={rzones} activePct={rPct} activeIdx={activeR} markerColor={loanStrategy.color} /></div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 10, color: "#5A5855", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Highest LTV</div>
-                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: ltvBarColor(maxLtv), letterSpacing: "-0.02em" }}>{fmtPct(maxLtv)}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, color: "#5A5855", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Total Debt</div>
-                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: "#1A1816", letterSpacing: "-0.02em" }}>{fmtUSD(totalDebt)}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, color: "#5A5855", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Liq. Distance</div>
-                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: liquidationDistance !== null && liquidationDistance < 0.3 ? "#7B2D2D" : "#1A1816", letterSpacing: "-0.02em" }}>{liquidationDistance !== null ? (liquidationDistance * 100).toFixed(0) + "%" : "—"}</div>
-                </div>
+                <div><div style={{ fontSize: 10, color: "#5A5855", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Highest LTV</div><div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: ltvBarColor(maxLtv) }}>{fmtPct(maxLtv)}</div></div>
+                <div><div style={{ fontSize: 10, color: "#5A5855", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Total Debt</div><div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: "#1A1816" }}>{fmtUSD(totalDebt)}</div></div>
+                <div><div style={{ fontSize: 10, color: "#5A5855", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Liq. Distance</div><div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: liquidationDistance !== null && liquidationDistance < 0.3 ? "#7B2D2D" : "#1A1816" }}>{liquidationDistance !== null ? (liquidationDistance * 100).toFixed(0) + "%" : "—"}</div></div>
               </div>
             </div>
 
-            {/* ── Indicators at a glance ── */}
-            <div style={{ marginTop: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: 2, marginBottom: 4 }}>
-                <span style={{ fontSize: 12, color: "#1A1816", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>Indicators</span>
-                <div style={{ flex: 1, height: "1px", background: "#D8D4CC" }} />
-              </div>
-            </div>
-            <div className="metric-card">
-              <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 14 }}>At a Glance</div>
-              {indicators.map((ind) => (
-                <div key={ind.label} className="ind-row">
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 14, color: "#2A2725" }}>{ind.label}</span>
-                    {ind.auto && <span style={{ fontSize: 10, color: "#C8963A", background: "#FDF3E3", padding: "1px 6px", borderRadius: 3, letterSpacing: "0.04em" }}>AUTO</span>}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 13, color: "#3A3835", fontVariantNumeric: "tabular-nums" }}>{String(ind.value)}</span>
-                    <span className="score-chip" style={{ background: ind.score > 0 ? "#E8F5ED" : ind.score < 0 ? "#FDECEA" : "#F4F3F0", color: ind.score > 0 ? "#2D5A3D" : ind.score < 0 ? "#7B2D2D" : "#6B6760" }}>
-                      {ind.score > 0 ? "+" : ""}{ind.score}
-                    </span>
-                  </div>
+            {lastUpdated && <div style={{ fontSize: 11, color: "#A8A49C", textAlign: "center" }}>Auto data last fetched {lastUpdated.toLocaleTimeString()}</div>}
+          </div>
+        )}
+
+        {/* ── INDICATORS TAB ── */}
+        {activeTab === "indicators" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Summary row */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 4 }}>
+              {indConfig.map(ind => (
+                <div key={ind.key} style={{ background: "#fff", border: "0.5px solid #E8E7E4", borderRadius: 10, padding: "12px 14px" }}>
+                  <div style={{ fontSize: 10, color: "#AAA", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>{ind.label}</div>
+                  <div style={{ fontSize: 18, fontWeight: 500, color: ind.color }}>{String(ind.value)}</div>
+                  <div style={{ fontSize: 11, color: ind.score > 0 ? "#2D5A3D" : ind.score < 0 ? "#7B2D2D" : "#888", marginTop: 2 }}>{ind.score > 0 ? "▲ Bullish" : ind.score < 0 ? "▼ Bearish" : "→ Neutral"}</div>
                 </div>
               ))}
             </div>
 
-            {lastUpdated && (
-              <div style={{ fontSize: 11, color: "#A8A49C", textAlign: "center" }}>
-                Auto data last fetched {lastUpdated.toLocaleTimeString()}
+            {/* Individual indicator cards */}
+            {indConfig.map(ind => {
+              const stale = staleness(manualTimestamps[ind.key]);
+              return (
+                <div key={ind.key} style={{ background: "#fff", border: "0.5px solid #E8E7E4", borderLeft: "4px solid " + ind.color, borderRadius: 12, padding: "18px 20px" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1816", marginBottom: 2 }}>{ind.label}</div>
+                      <div style={{ fontSize: 12, color: "#888", lineHeight: 1.5 }}>{ind.desc}</div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
+                      <div style={{ fontSize: 20, fontWeight: 500, color: ind.color }}>{String(ind.value)}</div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: ind.score > 0 ? "#2D5A3D" : ind.score < 0 ? "#7B2D2D" : "#888" }}>{ind.score > 0 ? "▲ Bullish" : ind.score < 0 ? "▼ Bearish" : "→ Neutral"}</div>
+                    </div>
+                  </div>
+
+                  <GaugeBar pct={ind.pct} color={ind.color} />
+
+                  <div style={{ fontSize: 10, color: "#B0ACA4", marginBottom: 14 }}>{ind.zones}</div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 12, borderTop: "0.5px solid #F0EFEC" }}>
+                    <div style={{ flex: 1 }}>
+                      {ind.type === "select" ? (
+                        <select className="sel" value={manual.lthTrend} onChange={e => handleManual("lthTrend", e.target.value)} style={{ width: "auto" }}>
+                          <option value="Accumulating">Accumulating</option>
+                          <option value="Neutral">Neutral</option>
+                          <option value="Dumping">Dumping</option>
+                        </select>
+                      ) : (
+                        <input className="inp" type="number" step={ind.step} value={manual[ind.key]}
+                          onChange={e => handleManual(ind.key, e.target.value)}
+                          style={{ maxWidth: 160 }} />
+                      )}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: stale.dot }} />
+                      <span style={{ fontSize: 11, color: stale.color }}>{stale.label}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Auto indicators reference */}
+            <div style={{ marginTop: 8 }}>
+              <SectionHeading title="Auto Indicators" />
+            </div>
+            <div className="metric-card">
+              <div style={{ fontSize: 12, color: "#C8963A", marginBottom: 16 }}>Pulled from CoinGecko — updates on page load</div>
+              {[
+                { label: "BTC Price", value: btcPrice ? fmtUSD(Math.round(btcPrice)) : "—" },
+                { label: "200W SMA", value: sma200w ? fmtUSD(Math.round(sma200w)) : "—" },
+                { label: "Weekly RSI (14)", value: weeklyRsi ? weeklyRsi.toFixed(2) : "—" },
+                { label: "Power Law Fair Value", value: powerLawPrice ? fmtUSD(Math.round(powerLawPrice)) : "—" },
+              ].map((r) => (
+                <div key={r.label} className="ind-row">
+                  <span style={{ fontSize: 14 }}>{r.label}</span>
+                  <span style={{ fontSize: 13, color: "#555" }}>{r.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Fear & Greed */}
+            <div className="metric-card">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase" }}>Fear & Greed Index</div>
+                <span style={{ fontSize: 10, color: "#C8963A", background: "#FDF3E3", padding: "1px 6px", borderRadius: 3 }}>Reference only</span>
               </div>
-            )}
+              {fearGreed ? (
+                <div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "12px 0" }}>
+                    <span style={{ fontSize: 28, fontWeight: 600, color: fearGreed.value >= 75 ? "#7B2D2D" : fearGreed.value >= 55 ? "#8B6914" : fearGreed.value >= 45 ? "#4A4845" : "#4A7C5A" }}>{fearGreed.value}</span>
+                    <span style={{ fontSize: 13, color: "#555", fontWeight: 600 }}>{fearGreed.label}</span>
+                  </div>
+                  <div style={{ height: 6, borderRadius: 3, background: "linear-gradient(to right, #C0392B, #E67E22, #95A5A6, #27AE60, #1A8A4A)", position: "relative", marginBottom: 6 }}>
+                    <div style={{ position: "absolute", top: "50%", left: fearGreed.value + "%", transform: "translate(-50%, -50%)", width: 10, height: 10, borderRadius: "50%", background: "#fff", border: "2px solid #1A1816" }} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#B0ACA4" }}>
+                    <span>Extreme Fear</span><span>Fear</span><span>Neutral</span><span>Greed</span><span>Extreme Greed</span>
+                  </div>
+                </div>
+              ) : <div style={{ fontSize: 13, color: "#CCC", padding: "8px 0" }}>Loading…</div>}
+            </div>
           </div>
         )}
 
@@ -618,7 +548,7 @@ export default function App() {
                 </div>
               )}
               <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr auto", gap: 12, padding: "0 0 8px", borderBottom: "0.5px solid #EBEBEB", marginBottom: 4 }}>
-                {["Lender", "Debt", "Collateral", "LTV", ""].map((h) => (<div key={h} style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.04em" }}>{h}</div>))}
+                {["Lender", "Debt", "Collateral", "LTV", ""].map((h) => (<div key={h} style={{ fontSize: 11, color: "#AAA" }}>{h}</div>))}
               </div>
               {loans.map((loan, i) => {
                 const ltv = loanLtvs[i];
@@ -663,127 +593,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ── INDICATORS TAB ── */}
-        {activeTab === "indicators" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <div className="metric-card">
-              <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Automatic Indicators</div>
-              <div style={{ fontSize: 12, color: "#C8963A", marginBottom: 16 }}>Pulled from CoinGecko — updates on page load</div>
-              {[
-                { label: "BTC Price", value: btcPrice ? fmtUSD(Math.round(btcPrice)) : "—" },
-                { label: "200W SMA", value: sma200w ? fmtUSD(Math.round(sma200w)) : "—" },
-                { label: "Weekly RSI (14)", value: weeklyRsi ? weeklyRsi.toFixed(2) : "—" },
-                { label: "Power Law Price", value: powerLawPrice ? fmtUSD(Math.round(powerLawPrice)) : "—" },
-                { label: "Power Law Position", value: powerLawPos },
-              ].map((r) => (
-                <div key={r.label} className="ind-row">
-                  <span style={{ fontSize: 14 }}>{r.label}</span>
-                  <span style={{ fontSize: 13, color: "#555", fontVariantNumeric: "tabular-nums" }}>{r.value}</span>
-                </div>
-              ))}
-            </div>
-            <div className="metric-card">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase" }}>Fear & Greed Index</div>
-                <span style={{ fontSize: 10, color: "#C8963A", background: "#FDF3E3", padding: "1px 6px", borderRadius: 3, letterSpacing: "0.04em" }}>AUTO</span>
-              </div>
-              <div style={{ fontSize: 12, color: "#AAA", marginBottom: 16 }}>Reference only — not weighted in the signal score</div>
-              {fearGreed ? (
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 12, marginBottom: 12, borderBottom: "0.5px solid #EBEBEB" }}>
-                    <div>
-                      <div style={{ fontSize: 11, color: "#555", letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>Today</div>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                        <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 28, fontWeight: 600, color: fearGreed.value >= 75 ? "#7B2D2D" : fearGreed.value >= 55 ? "#8B6914" : fearGreed.value >= 45 ? "#4A4845" : fearGreed.value >= 25 ? "#4A7C5A" : "#2D5A3D", letterSpacing: "-0.02em" }}>{fearGreed.value}</span>
-                        <span style={{ fontSize: 13, color: "#555", fontWeight: 600 }}>{fearGreed.label}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ marginTop: 14 }}>
-                    <div style={{ height: 6, borderRadius: 3, background: "linear-gradient(to right, #C0392B, #E67E22, #95A5A6, #27AE60, #1A8A4A)", position: "relative", marginBottom: 6 }}>
-                      <div style={{ position: "absolute", top: "50%", left: fearGreed.value + "%", transform: "translate(-50%, -50%)", width: 10, height: 10, borderRadius: "50%", background: "#fff", border: "2px solid #1A1816", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#B0ACA4" }}>
-                      <span>Extreme Fear</span><span>Fear</span><span>Neutral</span><span>Greed</span><span>Extreme Greed</span>
-                    </div>
-                  </div>
-                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: "0.5px solid #EBEBEB" }}>
-                    <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, marginBottom: 6 }}>Yesterday</div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                      <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 18, fontWeight: 500, color: "#AAA" }}>{fearGreed.prev}</span>
-                      <span style={{ fontSize: 12, color: "#AAA", fontWeight: 400 }}>{fearGreed.prevLabel}</span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ fontSize: 13, color: "#CCC", padding: "8px 0" }}>Loading…</div>
-              )}
-            </div>
-
-            <div className="metric-card">
-              <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Manual Indicators</div>
-              <div style={{ fontSize: 12, color: "#AAA", marginBottom: 16 }}>Update weekly from Glassnode, CryptoQuant, or similar</div>
-              <div style={{ display: "grid", gap: 18 }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                    <div style={{ fontSize: 12, color: "#888" }}>MVRV Z-Score <span style={{ color: "#CCC" }}>(current: {manual.mvrv})</span></div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: staleness(manualTimestamps.mvrv).dot }} />
-                      <span style={{ fontSize: 11, color: staleness(manualTimestamps.mvrv).color }}>{staleness(manualTimestamps.mvrv).label}</span>
-                    </div>
-                  </div>
-                  <input className="inp" type="number" step="0.01" value={manual.mvrv}
-                    onChange={e => { setManual({ ...manual, mvrv: e.target.value }); setManualTimestamps({ ...manualTimestamps, mvrv: new Date().toISOString() }); }}
-                    style={{ maxWidth: 180 }} />
-                  <div style={{ fontSize: 11, color: "#CCC", marginTop: 4 }}>Bullish &lt; 1.0 · Bearish &gt; 6.0</div>
-                </div>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                    <div style={{ fontSize: 12, color: "#888" }}>Puell Multiple <span style={{ color: "#CCC" }}>(current: {manual.puell})</span></div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: staleness(manualTimestamps.puell).dot }} />
-                      <span style={{ fontSize: 11, color: staleness(manualTimestamps.puell).color }}>{staleness(manualTimestamps.puell).label}</span>
-                    </div>
-                  </div>
-                  <input className="inp" type="number" step="0.01" value={manual.puell}
-                    onChange={e => { setManual({ ...manual, puell: e.target.value }); setManualTimestamps({ ...manualTimestamps, puell: new Date().toISOString() }); }}
-                    style={{ maxWidth: 180 }} />
-                  <div style={{ fontSize: 11, color: "#CCC", marginTop: 4 }}>Bullish &lt; 0.5 · Bearish &gt; 4.0</div>
-                </div>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                    <div style={{ fontSize: 12, color: "#888" }}>LTH Supply Trend</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: staleness(manualTimestamps.lthTrend).dot }} />
-                      <span style={{ fontSize: 11, color: staleness(manualTimestamps.lthTrend).color }}>{staleness(manualTimestamps.lthTrend).label}</span>
-                    </div>
-                  </div>
-                  <select className="sel" value={manual.lthTrend}
-                    onChange={e => { setManual({ ...manual, lthTrend: e.target.value }); setManualTimestamps({ ...manualTimestamps, lthTrend: new Date().toISOString() }); }}>
-                    <option value="Accumulating">Accumulating</option>
-                    <option value="Neutral">Neutral</option>
-                    <option value="Dumping">Dumping</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="metric-card">
-              <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 14 }}>Indicator Weights</div>
-              {Object.entries(WEIGHTS).map(([k, w]) => {
-                const labels = { mvrv: "MVRV Z-Score", powerLaw: "Power Law", sma200w: "200W SMA", puell: "Puell Multiple", lth: "LTH Supply Trend", rsi: "Weekly RSI" };
-                return (
-                  <div key={k} className="ind-row">
-                    <span style={{ fontSize: 14 }}>{labels[k]}</span>
-                    <div style={{ display: "flex", gap: 4 }}>
-                      {[1, 2, 3].map((dot) => (<div key={dot} style={{ width: 8, height: 8, borderRadius: "50%", background: dot <= w ? "#1C1C1A" : "#E8E7E4" }} />))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* ── HISTORY TAB ── */}
         {activeTab === "history" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -791,10 +600,7 @@ export default function App() {
               <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Macro Score History</div>
               <div style={{ fontSize: 12, color: "#CCC", marginBottom: 20 }}>Logged automatically once per day</div>
               {scoreHistory.length < 2 ? (
-                <div style={{ textAlign: "center", padding: "40px 0", color: "#CCC", fontSize: 14 }}>
-                  <div style={{ fontSize: 32, marginBottom: 12 }}>chart</div>
-                  <div>Your score history will build up here day by day.</div>
-                </div>
+                <div style={{ textAlign: "center", padding: "40px 0", color: "#CCC", fontSize: 14 }}>Your score history will build up here day by day.</div>
               ) : (
                 <svg width="100%" height="180" viewBox="0 0 600 180" preserveAspectRatio="none">
                   {(() => {
@@ -851,6 +657,7 @@ export default function App() {
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
