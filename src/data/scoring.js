@@ -1,11 +1,10 @@
 // ── Scoring functions ──────────────────────────────────────────────
 
-export const WEIGHTS = { mvrv: 3, powerLaw: 3, sma200w: 2, puell: 2, lth: 1, nupl: 2, reserveRisk: 2 };
+export const WEIGHTS = { mvrv: 3, powerLaw: 3, puell: 2, lth: 2, nupl: 2, reserveRisk: 2 };
 
 export function scoreMVRV(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 1.0) return w; if (n > 6) return -w; return 0; }
 export function scorePowerLaw(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 20) return w; if (n > 75) return -w; return 0; }
 export function scorePuell(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 0.5) return w; if (n > 4) return -w; return 0; }
-export function score200wSMA(price, sma, w) { if (!price || !sma) return 0; if (price <= sma) return w; if (price >= sma * 2.5) return -w; return 0; }
 export function scoreLTH(v, w) { if (v === "Accumulating") return w; if (v === "Dumping") return -w; return 0; }
 export function scoreNUPL(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 0.1) return w; if (n > 0.6) return -w; return 0; }
 export function scoreReserveRisk(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 0.0026) return w; if (n > 0.006) return -w; return 0; }
@@ -45,7 +44,7 @@ export function getMarketOutlook(score) {
   };
 }
 
-// ── BTC Strategy — driven by market signal only ────────────────────
+// ── BTC Strategy — market signal only ─────────────────────────────
 
 export function getBtcStrategy(score) {
   if (score <= -6) return {

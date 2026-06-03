@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { WEIGHTS, scoreMVRV, scorePowerLaw, scorePuell, score200wSMA, scoreLTH, scoreNUPL, scoreReserveRisk, getMarketOutlook, getBtcStrategy, getLoanStrategy } from "./data/scoring.js";
+import { WEIGHTS, scoreMVRV, scorePowerLaw, scorePuell, scoreLTH, scoreNUPL, scoreReserveRisk, getMarketOutlook, getBtcStrategy, getLoanStrategy } from "./data/scoring.js";
 
-const STORAGE_KEY = "btc-treasury-v2";
+const STORAGE_KEY = "btc-treasury-v3";
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Serif+Display:ital@0;1&display=swap');`;
 
 const DEFAULT_LOANS = [
@@ -9,8 +9,8 @@ const DEFAULT_LOANS = [
   { id: 2, lender: "Ledn", debt: 45000, collateral: 1.2 },
   { id: 3, lender: "Lava", debt: 80000, collateral: 2.1 },
 ];
-const DEFAULT_MANUAL = { mvrv: 0.58, puell: 0.79, lthTrend: "Accumulating", powerLaw: 4.4, nupl: 0.18, reserveRisk: 0.00115 };
-const DEFAULT_TIMESTAMPS = { mvrv: null, puell: null, lthTrend: null, powerLaw: null, nupl: null, reserveRisk: null };
+const DEFAULT_MANUAL = { mvrv: 0.58, puell: 0.79, lthTrend: "Accumulating", powerLaw: 4.4, nupl: 0.18, reserveRisk: 0.00115, sma200w: 42000 };
+const DEFAULT_TIMESTAMPS = { mvrv: null, puell: null, lthTrend: null, powerLaw: null, nupl: null, reserveRisk: null, sma200w: null };
 
 function daysSince(iso) {
   if (!iso) return null;
@@ -30,17 +30,6 @@ function calcPowerLawPrice(date) {
   const days = (date - genesis) / (1000 * 60 * 60 * 24);
   return Math.pow(10, 5.84 * Math.log10(days) - 17.01);
 }
-function calcRSI(closes, period = 14) {
-  if (closes.length < period + 1) return null;
-  let gains = 0, losses = 0;
-  for (let i = closes.length - period; i < closes.length; i++) {
-    const diff = closes[i] - closes[i - 1];
-    if (diff > 0) gains += diff; else losses += Math.abs(diff);
-  }
-  const avgGain = gains / period, avgLoss = losses / period;
-  if (avgLoss === 0) return 100;
-  return 100 - 100 / (1 + avgGain / avgLoss);
-}
 
 function fmt(n, decimals = 2) { if (n === null || n === undefined || isNaN(n)) return "—"; return Number(n).toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }); }
 function fmtPct(n) { if (n === null || n === undefined || isNaN(n)) return "—"; return (n * 100).toFixed(1) + "%"; }
@@ -48,9 +37,7 @@ function fmtUSD(n) { if (!n) return "—"; return "$" + Number(n).toLocaleString
 
 export default function App() {
   const [btcPrice, setBtcPrice] = useState(null);
-  const [athPrice, setAthPrice] = useState(108000);
-  const [sma200w, setSma200w] = useState(null);
-  const [weeklyRsi, setWeeklyRsi] = useState(null);
+  const [athPrice, setAthPrice] = useState(128000);
   const [powerLawPrice, setPowerLawPrice] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -64,7 +51,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [dataLoaded, setDataLoaded] = useState(false);
   const [scoreHistory, setScoreHistory] = useState([]);
-  const [fearGreed, setFearGreed] = useState(null);
   const [manualTimestamps, setManualTimestamps] = useState(DEFAULT_TIMESTAMPS);
 
   useEffect(() => {
@@ -73,10 +59,10 @@ export default function App() {
       if (saved) {
         const d = JSON.parse(saved);
         if (d.loans) setLoans(d.loans);
-        if (d.manual) setManual(d.manual);
+        if (d.manual) setManual({ ...DEFAULT_MANUAL, ...d.manual });
         if (d.nextId) setNextId(d.nextId);
         if (d.scoreHistory) setScoreHistory(d.scoreHistory);
-        if (d.manualTimestamps) setManualTimestamps(d.manualTimestamps);
+        if (d.manualTimestamps) setManualTimestamps({ ...DEFAULT_TIMESTAMPS, ...d.manualTimestamps });
       }
     } catch (e) {}
     setDataLoaded(true);
@@ -94,39 +80,23 @@ export default function App() {
         const res = await fetch("/api/btc-data");
         const data = await res.json();
         const prices = data.prices;
-        if (!prices || prices.length < 200) throw new Error("Not enough data");
+        if (!prices || prices.length < 100) throw new Error("Not enough data");
         const closes = prices.map((p) => p[1]);
         const latestPrice = closes[closes.length - 1];
         setBtcPrice(latestPrice);
         setAthPrice(Math.max(...closes));
-        const sma = closes.slice(-1400).reduce((a, b) => a + b, 0) / 1400;
-        setSma200w(sma);
-        const weeklyCloses = [];
-        for (let i = 6; i < closes.length; i += 7) weeklyCloses.push(closes[i]);
-        setWeeklyRsi(calcRSI(weeklyCloses, 14));
         setPowerLawPrice(calcPowerLawPrice(new Date()));
         setLastUpdated(new Date());
       } catch (e) { setFetchError(true); }
       setLoading(false);
     }
     fetchData();
-    async function fetchFearGreed() {
-      try {
-        const res = await fetch("/api/fear-greed");
-        const data = await res.json();
-        if (data && data.data && data.data.length >= 2) {
-          setFearGreed({ value: parseInt(data.data[0].value), label: data.data[0].value_classification, prev: parseInt(data.data[1].value), prevLabel: data.data[1].value_classification });
-        }
-      } catch (e) {}
-    }
-    fetchFearGreed();
   }, []);
 
   const scores = {
     mvrv: scoreMVRV(manual.mvrv, WEIGHTS.mvrv),
     powerLaw: scorePowerLaw(manual.powerLaw, WEIGHTS.powerLaw),
     puell: scorePuell(manual.puell, WEIGHTS.puell),
-    sma200w: score200wSMA(btcPrice, sma200w, WEIGHTS.sma200w),
     lth: scoreLTH(manual.lthTrend, WEIGHTS.lth),
     nupl: scoreNUPL(manual.nupl, WEIGHTS.nupl),
     reserveRisk: scoreReserveRisk(manual.reserveRisk, WEIGHTS.reserveRisk),
@@ -145,6 +115,7 @@ export default function App() {
   const btcStrategy = getBtcStrategy(totalScore);
 
   const distFromATH = btcPrice && athPrice ? ((btcPrice - athPrice) / athPrice) : null;
+  const btcVsSma = btcPrice && manual.sma200w ? (btcPrice / parseFloat(manual.sma200w)) : null;
 
   useEffect(() => {
     if (!btcPrice || !dataLoaded) return;
@@ -216,7 +187,6 @@ export default function App() {
     </div>
   );
 
-  // ── Indicator gauge bar ───────────────────────────────────────────
   const GaugeBar = ({ pct, color }) => (
     <div style={{ position: "relative", height: 10, borderRadius: 5, background: "#EAE8E3", overflow: "visible", margin: "8px 0 4px" }}>
       <div style={{ position: "absolute", top: -4, left: `calc(${Math.max(2, Math.min(98, pct))}% - 1.5px)`, width: 3, height: 18, background: color, borderRadius: 2, zIndex: 2 }} />
@@ -226,51 +196,51 @@ export default function App() {
 
   const indConfig = [
     {
-      key: "mvrv", label: "MVRV Z-Score", manual: true,
+      key: "mvrv", label: "MVRV Z-Score",
       value: manual.mvrv, score: scores.mvrv,
       pct: Math.max(2, Math.min(98, (parseFloat(manual.mvrv) / 10) * 100)),
       color: scores.mvrv > 0 ? "#2D5A3D" : scores.mvrv < 0 ? "#7B2D2D" : "#8B6914",
-      desc: "Compares market value to realised value. Below 1 = undervalued. Above 6 = overheated.",
+      desc: "Compares Bitcoin's market value to its realised value. Below 1 suggests undervaluation. Above 6 signals the market is significantly overheated.",
       zones: "Bullish < 1.0 · Neutral 1–6 · Bearish > 6.0", type: "number", step: "0.01"
     },
     {
-      key: "powerLaw", label: "Power Law Oscillator", manual: true,
+      key: "powerLaw", label: "Power Law Oscillator",
       value: manual.powerLaw, score: scores.powerLaw,
       pct: Math.max(2, Math.min(98, parseFloat(manual.powerLaw) || 0)),
       color: scores.powerLaw > 0 ? "#2D5A3D" : scores.powerLaw < 0 ? "#7B2D2D" : "#8B6914",
-      desc: "Position within the long-term Power Law corridor (0–100 scale). Below 20 = deep value. Above 75 = overheated.",
+      desc: "Position within the long-term Power Law corridor on a 0–100 scale. The model has an R² of 0.96, explaining 96% of all historical price variance. Below 20 = deep value. Above 75 = overheated.",
       zones: "Bullish < 20 · Neutral 20–75 · Bearish > 75", type: "number", step: "0.1"
     },
     {
-      key: "puell", label: "Puell Multiple", manual: true,
+      key: "puell", label: "Puell Multiple",
       value: manual.puell, score: scores.puell,
       pct: Math.max(2, Math.min(98, (parseFloat(manual.puell) / 6) * 100)),
       color: scores.puell > 0 ? "#2D5A3D" : scores.puell < 0 ? "#7B2D2D" : "#8B6914",
-      desc: "Miner daily revenue vs 365-day average. Low = miners under stress, less sell pressure. High = miners flush, more sell pressure.",
+      desc: "Compares miner daily revenue to its 365-day average. Low values mean miners are under stress and unlikely to sell. High values mean miners are flush and may increase selling pressure.",
       zones: "Bullish < 0.5 · Neutral 0.5–4 · Bearish > 4.0", type: "number", step: "0.01"
     },
     {
-      key: "lthTrend", label: "LTH Supply Trend", manual: true,
+      key: "lthTrend", label: "LTH Supply Trend",
       value: manual.lthTrend, score: scores.lth,
       pct: manual.lthTrend === "Accumulating" ? 15 : manual.lthTrend === "Dumping" ? 85 : 50,
       color: scores.lth > 0 ? "#2D5A3D" : scores.lth < 0 ? "#7B2D2D" : "#8B6914",
-      desc: "Are long-term holders (155+ days) accumulating or distributing? Accumulation = smart money buying. Distribution = smart money selling.",
+      desc: "Tracks whether long-term holders (wallets inactive for 155+ days) are accumulating or distributing. Accumulation during price weakness is the classic smart-money signal.",
       zones: "Bullish: Accumulating · Neutral · Bearish: Dumping", type: "select"
     },
     {
-      key: "nupl", label: "NUPL", manual: true,
+      key: "nupl", label: "NUPL",
       value: manual.nupl, score: scores.nupl,
       pct: Math.max(2, Math.min(98, ((parseFloat(manual.nupl) + 0.2) / 1.2) * 100)),
       color: scores.nupl > 0 ? "#2D5A3D" : scores.nupl < 0 ? "#7B2D2D" : "#8B6914",
-      desc: "Net Unrealised Profit/Loss — aggregate paper gain or loss across all wallets. Below 0.1 = fear/capitulation. Above 0.6 = euphoria.",
+      desc: "Net Unrealised Profit/Loss measures the aggregate paper gain or loss held across all wallets. Below 0.1 reflects fear or capitulation. Above 0.6 reflects euphoria and elevated sell pressure.",
       zones: "Bullish < 0.1 · Hope/Fear 0.1–0.6 · Bearish > 0.6", type: "number", step: "0.01"
     },
     {
-      key: "reserveRisk", label: "Reserve Risk", manual: true,
+      key: "reserveRisk", label: "Reserve Risk",
       value: manual.reserveRisk, score: scores.reserveRisk,
       pct: Math.max(2, Math.min(98, (parseFloat(manual.reserveRisk) / 0.01) * 100)),
       color: scores.reserveRisk > 0 ? "#2D5A3D" : scores.reserveRisk < 0 ? "#7B2D2D" : "#8B6914",
-      desc: "Price divided by the HODL Bank — measures conviction of long-term holders vs incentive to sell. Below 0.0026 = attractive risk/reward.",
+      desc: "Measures long-term holder conviction relative to the current price. When conviction is high and price is low, risk/reward is historically attractive. Below 0.0026 is the green zone.",
       zones: "Bullish < 0.0026 · Neutral 0.0026–0.006 · Bearish > 0.006", type: "number", step: "0.00001"
     },
   ];
@@ -349,17 +319,34 @@ export default function App() {
               </div>
               <div style={{ fontSize: 14, color: "#2A2725", lineHeight: 1.65, marginBottom: 18, paddingBottom: 18, borderBottom: "0.5px solid " + marketOutlook.border }}>{marketOutlook.body}</div>
               <div style={{ marginBottom: 16 }}><ScaleBar zones={vzones} activePct={vPct} activeIdx={activeV} markerColor={marketOutlook.color} /></div>
-              {btcPrice && athPrice && (
-                <div style={{ paddingTop: 14, borderTop: "0.5px solid " + marketOutlook.border, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                  <div><div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>BTC Price</div><div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 16, color: "#1A1816" }}>{fmtUSD(Math.round(btcPrice))}</div></div>
-                  <div><div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>All-Time High</div><div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 16, color: "#1A1816" }}>{fmtUSD(Math.round(athPrice))}</div></div>
-                  <div><div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>Distance from ATH</div><div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 16, color: distFromATH >= -0.1 ? "#2D5A3D" : distFromATH >= -0.3 ? "#8B6914" : "#7B2D2D" }}>{distFromATH >= 0 ? "At ATH" : (distFromATH * 100).toFixed(1) + "%"}</div></div>
+              {btcPrice && (
+                <div style={{ paddingTop: 14, borderTop: "0.5px solid " + marketOutlook.border, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>BTC Price</div>
+                    <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 16, color: "#1A1816" }}>{fmtUSD(Math.round(btcPrice))}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>200W SMA</div>
+                    <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 16, color: "#1A1816" }}>{manual.sma200w ? fmtUSD(parseFloat(manual.sma200w)) : "—"}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>vs 200W SMA</div>
+                    <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 16, color: btcVsSma ? (btcVsSma < 1.5 ? "#2D5A3D" : btcVsSma < 3 ? "#8B6914" : "#7B2D2D") : "#1A1816" }}>
+                      {btcVsSma ? btcVsSma.toFixed(2) + "x" : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>From ATH</div>
+                    <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 16, color: distFromATH >= -0.1 ? "#2D5A3D" : distFromATH >= -0.3 ? "#8B6914" : "#7B2D2D" }}>
+                      {distFromATH !== null ? (distFromATH >= 0 ? "At ATH" : (distFromATH * 100).toFixed(1) + "%") : "—"}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
 
             <div style={{ marginTop: 4 }}><SectionHeading title="BTC Strategy" /></div>
-            <div style={{ background: "#FEFDFB", border: "0.5px solid #D8D4CC", borderLeft: "5px solid " + btcStrategy.color, borderRadius: 16, padding: "28px 28px 24px", boxShadow: "0 2px 12px rgba(20,18,14,0.08)" }}>
+            <div style={{ background: btcStrategy.bg, border: "0.5px solid " + btcStrategy.border, borderLeft: "5px solid " + btcStrategy.color, borderRadius: 16, padding: "28px 28px 24px", boxShadow: "0 2px 12px rgba(20,18,14,0.08)" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 18 }}>
                 <div>
                   <div style={{ fontSize: 10, color: btcStrategy.color, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>BTC Strategy</div>
@@ -375,22 +362,7 @@ export default function App() {
                   </div>
                 </div>
               </div>
-              <div style={{ fontSize: 14, color: "#2A2725", lineHeight: 1.7, paddingTop: 18, borderTop: "0.5px solid #E2DFD8", marginBottom: 18 }}>{btcStrategy.reason}</div>
-              <div style={{ paddingTop: 16, borderTop: "0.5px solid #E2DFD8" }}>
-                <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600, marginBottom: 10 }}>Context</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  <div style={{ background: "#F5F3EF", borderRadius: 8, padding: "10px 14px", border: "0.5px solid #E2DFD8" }}>
-                    <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Market Signal</div>
-                    <div style={{ fontSize: 13, color: marketOutlook.color, fontWeight: 600 }}>{marketOutlook.label}</div>
-                    <div style={{ fontSize: 11, color: "#6B6760", marginTop: 2 }}>Score {totalScore > 0 ? "+" : ""}{totalScore}</div>
-                  </div>
-                  <div style={{ background: "#F5F3EF", borderRadius: 8, padding: "10px 14px", border: "0.5px solid #E2DFD8" }}>
-                    <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Loan Position</div>
-                    <div style={{ fontSize: 13, color: loanStrategy.color, fontWeight: 600 }}>{loanStrategy.label}</div>
-                    <div style={{ fontSize: 11, color: "#6B6760", marginTop: 2 }}>LTV {fmtPct(portfolioLtv)}</div>
-                  </div>
-                </div>
-              </div>
+              <div style={{ fontSize: 14, color: "#2A2725", lineHeight: 1.7, paddingTop: 18, borderTop: "0.5px solid " + btcStrategy.border }}>{btcStrategy.reason}</div>
             </div>
 
             <div style={{ marginTop: 4 }}><SectionHeading title="Loan Strategy" /></div>
@@ -429,7 +401,6 @@ export default function App() {
         {activeTab === "indicators" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-            {/* Summary row */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 4 }}>
               {indConfig.map(ind => (
                 <div key={ind.key} style={{ background: "#fff", border: "0.5px solid #E8E7E4", borderRadius: 10, padding: "12px 14px" }}>
@@ -440,26 +411,22 @@ export default function App() {
               ))}
             </div>
 
-            {/* Individual indicator cards */}
             {indConfig.map(ind => {
               const stale = staleness(manualTimestamps[ind.key]);
               return (
                 <div key={ind.key} style={{ background: "#fff", border: "0.5px solid #E8E7E4", borderLeft: "4px solid " + ind.color, borderRadius: 12, padding: "18px 20px" }}>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6 }}>
-                    <div>
+                    <div style={{ flex: 1, paddingRight: 12 }}>
                       <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1816", marginBottom: 2 }}>{ind.label}</div>
                       <div style={{ fontSize: 12, color: "#888", lineHeight: 1.5 }}>{ind.desc}</div>
                     </div>
-                    <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
                       <div style={{ fontSize: 20, fontWeight: 500, color: ind.color }}>{String(ind.value)}</div>
                       <div style={{ fontSize: 11, fontWeight: 600, color: ind.score > 0 ? "#2D5A3D" : ind.score < 0 ? "#7B2D2D" : "#888" }}>{ind.score > 0 ? "▲ Bullish" : ind.score < 0 ? "▼ Bearish" : "→ Neutral"}</div>
                     </div>
                   </div>
-
                   <GaugeBar pct={ind.pct} color={ind.color} />
-
                   <div style={{ fontSize: 10, color: "#B0ACA4", marginBottom: 14 }}>{ind.zones}</div>
-
                   <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 12, borderTop: "0.5px solid #F0EFEC" }}>
                     <div style={{ flex: 1 }}>
                       {ind.type === "select" ? (
@@ -469,9 +436,7 @@ export default function App() {
                           <option value="Dumping">Dumping</option>
                         </select>
                       ) : (
-                        <input className="inp" type="number" step={ind.step} value={manual[ind.key]}
-                          onChange={e => handleManual(ind.key, e.target.value)}
-                          style={{ maxWidth: 160 }} />
+                        <input className="inp" type="number" step={ind.step} value={manual[ind.key]} onChange={e => handleManual(ind.key, e.target.value)} style={{ maxWidth: 160 }} />
                       )}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -483,45 +448,57 @@ export default function App() {
               );
             })}
 
-            {/* Auto indicators reference */}
-            <div style={{ marginTop: 8 }}>
-              <SectionHeading title="Auto Indicators" />
-            </div>
+            <div style={{ marginTop: 8 }}><SectionHeading title="Reference Data" /></div>
             <div className="metric-card">
-              <div style={{ fontSize: 12, color: "#C8963A", marginBottom: 16 }}>Pulled from CoinGecko — updates on page load</div>
-              {[
-                { label: "BTC Price", value: btcPrice ? fmtUSD(Math.round(btcPrice)) : "—" },
-                { label: "200W SMA", value: sma200w ? fmtUSD(Math.round(sma200w)) : "—" },
-                { label: "Weekly RSI (14)", value: weeklyRsi ? weeklyRsi.toFixed(2) : "—" },
-                { label: "Power Law Fair Value", value: powerLawPrice ? fmtUSD(Math.round(powerLawPrice)) : "—" },
-              ].map((r) => (
-                <div key={r.label} className="ind-row">
-                  <span style={{ fontSize: 14 }}>{r.label}</span>
-                  <span style={{ fontSize: 13, color: "#555" }}>{r.value}</span>
+              <div style={{ fontSize: 12, color: "#888", marginBottom: 16, lineHeight: 1.5 }}>The 200-week moving average is Bitcoin's most watched long-term support level. It has never been broken in Bitcoin's history. Update weekly from <span style={{ color: "#C8963A" }}>glassnode.com</span> or <span style={{ color: "#C8963A" }}>bitcoinmagazinepro.com</span></div>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, paddingBottom: 16, marginBottom: 16, borderBottom: "0.5px solid #EBEBEB" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: "#AAA", marginBottom: 6 }}>200W SMA (update weekly)</div>
+                  <input className="inp" type="number" step="100" value={manual.sma200w} onChange={e => handleManual("sma200w", e.target.value)} style={{ maxWidth: 180 }} />
                 </div>
-              ))}
+                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <div style={{ width: 7, height: 7, borderRadius: "50%", background: staleness(manualTimestamps.sma200w).dot }} />
+                  <span style={{ fontSize: 11, color: staleness(manualTimestamps.sma200w).color }}>{staleness(manualTimestamps.sma200w).label}</span>
+                </div>
+              </div>
+              {btcPrice && manual.sma200w && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>BTC Price</div>
+                    <div style={{ fontSize: 16, fontWeight: 500, color: "#1A1816" }}>{fmtUSD(Math.round(btcPrice))}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>200W SMA</div>
+                    <div style={{ fontSize: 16, fontWeight: 500, color: "#1A1816" }}>{fmtUSD(parseFloat(manual.sma200w))}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Multiple</div>
+                    <div style={{ fontSize: 16, fontWeight: 500, color: btcVsSma < 1.5 ? "#2D5A3D" : btcVsSma < 3 ? "#8B6914" : "#7B2D2D" }}>{btcVsSma ? btcVsSma.toFixed(2) + "x" : "—"}</div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Fear & Greed */}
             <div className="metric-card">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase" }}>Fear & Greed Index</div>
-                <span style={{ fontSize: 10, color: "#C8963A", background: "#FDF3E3", padding: "1px 6px", borderRadius: 3 }}>Reference only</span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase" }}>Power Law Fair Value</div>
+                <span style={{ fontSize: 10, color: "#C8963A", background: "#FDF3E3", padding: "1px 6px", borderRadius: 3 }}>Auto</span>
               </div>
-              {fearGreed ? (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "12px 0" }}>
-                    <span style={{ fontSize: 28, fontWeight: 600, color: fearGreed.value >= 75 ? "#7B2D2D" : fearGreed.value >= 55 ? "#8B6914" : fearGreed.value >= 45 ? "#4A4845" : "#4A7C5A" }}>{fearGreed.value}</span>
-                    <span style={{ fontSize: 13, color: "#555", fontWeight: 600 }}>{fearGreed.label}</span>
-                  </div>
-                  <div style={{ height: 6, borderRadius: 3, background: "linear-gradient(to right, #C0392B, #E67E22, #95A5A6, #27AE60, #1A8A4A)", position: "relative", marginBottom: 6 }}>
-                    <div style={{ position: "absolute", top: "50%", left: fearGreed.value + "%", transform: "translate(-50%, -50%)", width: 10, height: 10, borderRadius: "50%", background: "#fff", border: "2px solid #1A1816" }} />
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#B0ACA4" }}>
-                    <span>Extreme Fear</span><span>Fear</span><span>Neutral</span><span>Greed</span><span>Extreme Greed</span>
-                  </div>
+                  <div style={{ fontSize: 10, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Model Fair Value</div>
+                  <div style={{ fontSize: 16, fontWeight: 500, color: "#1A1816" }}>{powerLawPrice ? fmtUSD(Math.round(powerLawPrice)) : "—"}</div>
                 </div>
-              ) : <div style={{ fontSize: 13, color: "#CCC", padding: "8px 0" }}>Loading…</div>}
+                <div>
+                  <div style={{ fontSize: 10, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Current Price</div>
+                  <div style={{ fontSize: 16, fontWeight: 500, color: "#1A1816" }}>{btcPrice ? fmtUSD(Math.round(btcPrice)) : "—"}</div>
+                </div>
+              </div>
+              {btcPrice && powerLawPrice && (
+                <div style={{ marginTop: 10, fontSize: 12, color: btcPrice < powerLawPrice ? "#2D5A3D" : "#8B6914" }}>
+                  {btcPrice < powerLawPrice ? "▲ Trading " + ((1 - btcPrice / powerLawPrice) * 100).toFixed(0) + "% below model fair value" : "▼ Trading " + ((btcPrice / powerLawPrice - 1) * 100).toFixed(0) + "% above model fair value"}
+                </div>
+              )}
             </div>
           </div>
         )}
