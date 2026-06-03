@@ -683,6 +683,41 @@ export default function App() {
               ))}
             </div>
             <div className="metric-card">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase" }}>Fear & Greed Index</div>
+                <span style={{ fontSize: 10, color: "#C8963A", background: "#FDF3E3", padding: "1px 6px", borderRadius: 3, letterSpacing: "0.04em" }}>AUTO</span>
+              </div>
+              <div style={{ fontSize: 12, color: "#AAA", marginBottom: 16 }}>Reference only — not weighted in the signal score</div>
+              {fearGreed ? (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 12, marginBottom: 12, borderBottom: "0.5px solid #EBEBEB" }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>Today</div>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                        <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, color: fearGreed.value >= 75 ? "#7B2D2D" : fearGreed.value >= 55 ? "#8B6914" : fearGreed.value >= 45 ? "#4A4845" : fearGreed.value >= 25 ? "#4A7C5A" : "#2D5A3D", letterSpacing: "-0.02em" }}>{fearGreed.value}</span>
+                        <span style={{ fontSize: 13, color: "#555", fontWeight: 500 }}>{fearGreed.label}</span>
+                      </div>
+                    </div>
+                    <div style={{ width: 120 }}>
+                      <div style={{ height: 6, borderRadius: 3, background: "linear-gradient(to right, #2D5A3D, #4A7C5A, #9A9590, #C88A1A, #A83030)", position: "relative", marginBottom: 4 }}>
+                        <div style={{ position: "absolute", top: "50%", left: fearGreed.value + "%", transform: "translate(-50%, -50%)", width: 10, height: 10, borderRadius: "50%", background: "#fff", border: "2px solid #1A1816", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#CCC" }}>
+                        <span>Fear</span><span>Greed</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="ind-row">
+                    <span style={{ fontSize: 13, color: "#888" }}>Yesterday</span>
+                    <span style={{ fontSize: 13, color: "#555" }}>{fearGreed.prev} — {fearGreed.prevLabel}</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: "#CCC", padding: "8px 0" }}>Loading…</div>
+              )}
+            </div>
+
+            <div className="metric-card">
               <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Manual Indicators</div>
               <div style={{ fontSize: 12, color: "#AAA", marginBottom: 16 }}>Update weekly from Glassnode, CryptoQuant, or similar</div>
               <div style={{ display: "grid", gap: 18 }}>
