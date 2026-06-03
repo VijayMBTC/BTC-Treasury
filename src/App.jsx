@@ -193,7 +193,7 @@ export default function App() {
 
     async function fetchFearGreed() {
       try {
-        const res = await fetch("https://api.alternative.me/fng/?limit=2");
+        const res = await fetch("/api/fear-greed");
         const data = await res.json();
         if (data && data.data && data.data.length >= 2) {
           setFearGreed({
