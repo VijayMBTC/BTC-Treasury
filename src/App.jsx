@@ -10,6 +10,20 @@ const DEFAULT_LOANS = [
   { id: 3, lender: "Lava", debt: 80000, collateral: 2.1 },
 ];
 const DEFAULT_MANUAL = { mvrv: 0.26, puell: 1.1, lthTrend: "Accumulating" };
+const DEFAULT_TIMESTAMPS = { mvrv: null, puell: null, lthTrend: null };
+
+function daysSince(iso) {
+  if (!iso) return null;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
+}
+function staleness(iso) {
+  const d = daysSince(iso);
+  if (d === null) return { label: "Never updated", color: "#C0392B", dot: "#C0392B" };
+  if (d === 0) return { label: "Updated today", color: "#2D5A3D", dot: "#2D5A3D" };
+  if (d <= 3) return { label: d + "d ago", color: "#4A7C5A", dot: "#4A7C5A" };
+  if (d <= 7) return { label: d + "d ago", color: "#8B6914", dot: "#C8963A" };
+  return { label: d + "d ago — update recommended", color: "#C0392B", dot: "#C0392B" };
+}
 
 function scoreMVRV(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 1.0) return w; if (n > 6) return -w; return 0; }
 function scorePowerLaw(v, w) { if (v === "Floor") return w; if (v === "Top") return -w; return 0; }
@@ -125,6 +139,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [dataLoaded, setDataLoaded] = useState(false);
   const [scoreHistory, setScoreHistory] = useState([]);
+  const [fearGreed, setFearGreed] = useState(null);
+  const [manualTimestamps, setManualTimestamps] = useState(DEFAULT_TIMESTAMPS);
 
   useEffect(() => {
     try {
@@ -135,6 +151,7 @@ export default function App() {
         if (d.manual) setManual(d.manual);
         if (d.nextId) setNextId(d.nextId);
         if (d.scoreHistory) setScoreHistory(d.scoreHistory);
+        if (d.manualTimestamps) setManualTimestamps(d.manualTimestamps);
       }
     } catch (e) {}
     setDataLoaded(true);
@@ -142,7 +159,7 @@ export default function App() {
 
   useEffect(() => {
     if (!dataLoaded) return;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ loans, manual, nextId, scoreHistory })); } catch (e) {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ loans, manual, nextId, scoreHistory, manualTimestamps })); } catch (e) {}
   }, [loans, manual, nextId, scoreHistory, dataLoaded]);
 
   useEffect(() => {
@@ -173,6 +190,22 @@ export default function App() {
       setLoading(false);
     }
     fetchData();
+
+    async function fetchFearGreed() {
+      try {
+        const res = await fetch("https://api.alternative.me/fng/?limit=2");
+        const data = await res.json();
+        if (data && data.data && data.data.length >= 2) {
+          setFearGreed({
+            value: parseInt(data.data[0].value),
+            label: data.data[0].value_classification,
+            prev: parseInt(data.data[1].value),
+            prevLabel: data.data[1].value_classification,
+          });
+        }
+      } catch (e) {}
+    }
+    fetchFearGreed();
   }, []);
 
   const scores = {
@@ -652,20 +685,43 @@ export default function App() {
             <div className="metric-card">
               <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Manual Indicators</div>
               <div style={{ fontSize: 12, color: "#AAA", marginBottom: 16 }}>Update weekly from Glassnode, CryptoQuant, or similar</div>
-              <div style={{ display: "grid", gap: 14 }}>
+              <div style={{ display: "grid", gap: 18 }}>
                 <div>
-                  <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>MVRV Z-Score <span style={{ color: "#CCC" }}>(current: {manual.mvrv})</span></div>
-                  <input className="inp" type="number" step="0.01" value={manual.mvrv} onChange={e => setManual({ ...manual, mvrv: e.target.value })} style={{ maxWidth: 180 }} />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ fontSize: 12, color: "#888" }}>MVRV Z-Score <span style={{ color: "#CCC" }}>(current: {manual.mvrv})</span></div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: staleness(manualTimestamps.mvrv).dot }} />
+                      <span style={{ fontSize: 11, color: staleness(manualTimestamps.mvrv).color }}>{staleness(manualTimestamps.mvrv).label}</span>
+                    </div>
+                  </div>
+                  <input className="inp" type="number" step="0.01" value={manual.mvrv}
+                    onChange={e => { setManual({ ...manual, mvrv: e.target.value }); setManualTimestamps({ ...manualTimestamps, mvrv: new Date().toISOString() }); }}
+                    style={{ maxWidth: 180 }} />
                   <div style={{ fontSize: 11, color: "#CCC", marginTop: 4 }}>Bullish &lt; 1.0 · Bearish &gt; 6.0</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>Puell Multiple <span style={{ color: "#CCC" }}>(current: {manual.puell})</span></div>
-                  <input className="inp" type="number" step="0.01" value={manual.puell} onChange={e => setManual({ ...manual, puell: e.target.value })} style={{ maxWidth: 180 }} />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ fontSize: 12, color: "#888" }}>Puell Multiple <span style={{ color: "#CCC" }}>(current: {manual.puell})</span></div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: staleness(manualTimestamps.puell).dot }} />
+                      <span style={{ fontSize: 11, color: staleness(manualTimestamps.puell).color }}>{staleness(manualTimestamps.puell).label}</span>
+                    </div>
+                  </div>
+                  <input className="inp" type="number" step="0.01" value={manual.puell}
+                    onChange={e => { setManual({ ...manual, puell: e.target.value }); setManualTimestamps({ ...manualTimestamps, puell: new Date().toISOString() }); }}
+                    style={{ maxWidth: 180 }} />
                   <div style={{ fontSize: 11, color: "#CCC", marginTop: 4 }}>Bullish &lt; 0.5 · Bearish &gt; 4.0</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>LTH Supply Trend</div>
-                  <select className="sel" value={manual.lthTrend} onChange={e => setManual({ ...manual, lthTrend: e.target.value })}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ fontSize: 12, color: "#888" }}>LTH Supply Trend</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: staleness(manualTimestamps.lthTrend).dot }} />
+                      <span style={{ fontSize: 11, color: staleness(manualTimestamps.lthTrend).color }}>{staleness(manualTimestamps.lthTrend).label}</span>
+                    </div>
+                  </div>
+                  <select className="sel" value={manual.lthTrend}
+                    onChange={e => { setManual({ ...manual, lthTrend: e.target.value }); setManualTimestamps({ ...manualTimestamps, lthTrend: new Date().toISOString() }); }}>
                     <option value="Accumulating">Accumulating</option>
                     <option value="Neutral">Neutral</option>
                     <option value="Dumping">Dumping</option>
