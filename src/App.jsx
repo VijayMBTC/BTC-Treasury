@@ -692,7 +692,7 @@ export default function App() {
                 <div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 12, marginBottom: 12, borderBottom: "0.5px solid #EBEBEB" }}>
                     <div>
-                      <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>Today</div>
+                      <div style={{ fontSize: 11, color: "#555", letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>Today</div>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                         <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 28, fontWeight: 600, color: fearGreed.value >= 75 ? "#7B2D2D" : fearGreed.value >= 55 ? "#8B6914" : fearGreed.value >= 45 ? "#4A4845" : fearGreed.value >= 25 ? "#4A7C5A" : "#2D5A3D", letterSpacing: "-0.02em" }}>{fearGreed.value}</span>
                         <span style={{ fontSize: 13, color: "#555", fontWeight: 600 }}>{fearGreed.label}</span>
@@ -707,8 +707,8 @@ export default function App() {
                       <span>Extreme Fear</span><span>Fear</span><span>Neutral</span><span>Greed</span><span>Extreme Greed</span>
                     </div>
                   </div>
-                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: "0.5px solid #EBEBEB", textAlign: "left" }}>
-                    <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 6, textAlign: "left" }}>Yesterday</div>
+                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: "0.5px solid #EBEBEB" }}>
+                    <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, marginBottom: 6 }}>Yesterday</div>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                       <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 18, fontWeight: 500, color: "#AAA" }}>{fearGreed.prev}</span>
                       <span style={{ fontSize: 12, color: "#AAA", fontWeight: 400 }}>{fearGreed.prevLabel}</span>
