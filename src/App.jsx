@@ -367,11 +367,11 @@ function LoansTab({ loans, loanLtvs, editingLoan, setEditingLoan, showAddLoan, s
 
             return (
               <div>
-                <IntelligenceHeading title="Capital Capacity" />
+                <IntelligenceHeading title="Additional Capital Capacity" />
                 <div style={{ background: zoneBg, border: "0.5px solid " + zoneBorder, borderLeft: "4px solid " + zoneColor, borderRadius: 14, padding: "24px 26px" }}>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6 }}>
                     <div>
-                      <div style={{ fontSize: 10, color: zoneColor, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Capital Capacity</div>
+                      <div style={{ fontSize: 10, color: zoneColor, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Additional Capital Capacity</div>
                       {isAboveThreshold ? (
                         <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 22, color: "#4A4845", letterSpacing: "-0.02em", lineHeight: 1.2 }}>Not Applicable</div>
                       ) : capacityAtTarget > 0 ? (
