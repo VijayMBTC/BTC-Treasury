@@ -349,6 +349,85 @@ function LoansTab({ loans, loanLtvs, editingLoan, setEditingLoan, showAddLoan, s
             </div>
           )}
 
+          {/* ── C2. OPPORTUNITY COST ── */}
+          {(() => {
+            const TARGET_LTV = 0.45;
+            const CAPACITY_THRESHOLD = 0.50;
+            const totalDebt = loans.reduce((s, l) => s + (parseFloat(l.debt) || 0), 0);
+            const totalCollateral = loans.reduce((s, l) => s + (parseFloat(l.collateral) || 0), 0);
+            const collateralValue = totalCollateral * btcPrice;
+            const currentLtv = totalDebt / collateralValue;
+            const capacityAtTarget = (collateralValue * TARGET_LTV) - totalDebt;
+            const isAboveThreshold = currentLtv >= CAPACITY_THRESHOLD;
+            const zoneColor = isAboveThreshold ? "#4A4845" : capacityAtTarget > 0 ? "#1E3F5A" : "#4A4845";
+            const zoneBg = isAboveThreshold ? "#F5F3EF" : capacityAtTarget > 0 ? "#F2F6FA" : "#F5F3EF";
+            const zoneBorder = isAboveThreshold ? "#C8C4BC" : capacityAtTarget > 0 ? "#8AAEC8" : "#C8C4BC";
+            const utilisationPct = Math.min(100, (currentLtv / TARGET_LTV) * 100);
+            const fmtUSDLocal = (n) => "$" + Number(Math.round(n)).toLocaleString("en-US");
+
+            return (
+              <div>
+                <IntelligenceHeading title="Capital Capacity" />
+                <div style={{ background: zoneBg, border: "0.5px solid " + zoneBorder, borderLeft: "4px solid " + zoneColor, borderRadius: 14, padding: "24px 26px" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: zoneColor, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Capital Capacity</div>
+                      {isAboveThreshold ? (
+                        <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 22, color: "#4A4845", letterSpacing: "-0.02em", lineHeight: 1.2 }}>Not Applicable</div>
+                      ) : capacityAtTarget > 0 ? (
+                        <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 34, color: zoneColor, letterSpacing: "-0.03em", lineHeight: 1 }}>{fmtUSDLocal(capacityAtTarget)}</div>
+                      ) : (
+                        <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 22, color: "#4A4845", letterSpacing: "-0.02em", lineHeight: 1.2 }}>At Capacity</div>
+                      )}
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Current LTV</div>
+                      <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: zoneColor, letterSpacing: "-0.02em" }}>{(currentLtv * 100).toFixed(1)}%</div>
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: 11, color: "#888", marginBottom: 16 }}>
+                    Based on: Target LTV 45% · BTC at {fmtUSDLocal(btcPrice)}
+                  </div>
+
+                  <div style={{ fontSize: 14, color: "#2A2725", lineHeight: 1.65, marginBottom: 18, paddingBottom: 18, borderBottom: "0.5px solid " + zoneBorder }}>
+                    {isAboveThreshold
+                      ? "Portfolio LTV is above 50%. Capital capacity is not a relevant consideration at this level. Focus on reducing leverage before assessing available headroom."
+                      : capacityAtTarget > 0
+                      ? "At a 45% LTV, there may be capacity to access an additional " + fmtUSDLocal(capacityAtTarget) + " against your existing collateral. This reflects the difference between your current debt and what a 45% LTV structure would permit."
+                      : "Your current debt already exceeds a 45% LTV against your collateral. There is no additional capacity at the target threshold."}
+                  </div>
+
+                  {!isAboveThreshold && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#888", marginBottom: 6, letterSpacing: "0.04em" }}>
+                        <span>Current utilisation</span>
+                        <span>{utilisationPct.toFixed(0)}% of target capacity used</span>
+                      </div>
+                      <div style={{ height: 6, borderRadius: 3, background: "#E8E7E4", position: "relative", marginBottom: 16 }}>
+                        <div style={{ height: "100%", width: Math.min(100, utilisationPct) + "%", background: utilisationPct > 90 ? "#8B6914" : zoneColor, borderRadius: 3, transition: "width 0.6s ease" }} />
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                        <div style={{ background: zoneColor + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + zoneBorder }}>
+                          <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Current Debt</div>
+                          <div style={{ fontSize: 15, color: "#1A1816", fontWeight: 600, fontFamily: "'DM Serif Display', serif" }}>{fmtUSDLocal(totalDebt)}</div>
+                        </div>
+                        <div style={{ background: zoneColor + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + zoneBorder }}>
+                          <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Capacity at 45% LTV</div>
+                          <div style={{ fontSize: 15, color: "#1A1816", fontWeight: 600, fontFamily: "'DM Serif Display', serif" }}>{fmtUSDLocal(collateralValue * TARGET_LTV)}</div>
+                        </div>
+                        <div style={{ background: zoneColor + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + zoneBorder }}>
+                          <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Available Headroom</div>
+                          <div style={{ fontSize: 15, color: capacityAtTarget > 0 ? zoneColor : "#888", fontWeight: 600, fontFamily: "'DM Serif Display', serif" }}>{capacityAtTarget > 0 ? fmtUSDLocal(capacityAtTarget) : "—"}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* ── D. INDIVIDUAL LOAN STRESS TESTS ── */}
           <IntelligenceHeading title="Individual Loan Stress Tests" />
           {loans.map((loan, i) => {
