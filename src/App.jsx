@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { runPortfolioStressTest, runLoanStressTest, calcBtcBuffer, getWeakestLink, runHistoricalScenarios } from "./stressEngine.js";
 
 const STORAGE_KEY = "btc-treasury-v1";
 const WEIGHTS = { mvrv: 3, powerLaw: 3, sma200w: 2, puell: 2, lth: 1, rsi: 1 };
@@ -10,6 +11,20 @@ const DEFAULT_LOANS = [
   { id: 3, lender: "Lava", debt: 80000, collateral: 2.1 },
 ];
 const DEFAULT_MANUAL = { mvrv: 0.26, puell: 1.1, lthTrend: "Accumulating" };
+const DEFAULT_TIMESTAMPS = { mvrv: null, puell: null, lthTrend: null };
+
+function daysSince(iso) {
+  if (!iso) return null;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
+}
+function staleness(iso) {
+  const d = daysSince(iso);
+  if (d === null) return { label: "Never updated", color: "#C0392B", dot: "#C0392B" };
+  if (d === 0) return { label: "Updated today", color: "#2D5A3D", dot: "#2D5A3D" };
+  if (d <= 3) return { label: d + "d ago", color: "#4A7C5A", dot: "#4A7C5A" };
+  if (d <= 7) return { label: d + "d ago", color: "#8B6914", dot: "#C8963A" };
+  return { label: d + "d ago — update recommended", color: "#C0392B", dot: "#C0392B" };
+}
 
 function scoreMVRV(v, w) { if (v === "" || v === null || v === undefined) return 0; const n = parseFloat(v); if (n < 1.0) return w; if (n > 6) return -w; return 0; }
 function scorePowerLaw(v, w) { if (v === "Floor") return w; if (v === "Top") return -w; return 0; }
@@ -106,6 +121,316 @@ function fmt(n, decimals = 2) { if (n === null || n === undefined || isNaN(n)) r
 function fmtPct(n) { if (n === null || n === undefined || isNaN(n)) return "—"; return (n * 100).toFixed(1) + "%"; }
 function fmtUSD(n) { if (!n) return "—"; return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
 
+// ── TREASURY INTELLIGENCE SUB-COMPONENTS ──────────────────────
+
+function IntelligenceHeading({ title, subtitle }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: subtitle ? 4 : 0 }}>
+        <span style={{ fontSize: 12, color: "#1A1816", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>{title}</span>
+        <div style={{ flex: 1, height: "1px", background: "#D8D4CC" }} />
+      </div>
+      {subtitle && <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>{subtitle}</div>}
+    </div>
+  );
+}
+
+function ZoneBadge({ zone }) {
+  return (
+    <span style={{ display: "inline-block", background: zone.badge.bg, color: zone.badge.text, fontSize: 10, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 9px", borderRadius: 4 }}>
+      {zone.label}
+    </span>
+  );
+}
+
+function StressTable({ rows, isLoan }) {
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead>
+          <tr style={{ borderBottom: "0.5px solid #EBEBEB" }}>
+            <th style={{ textAlign: "left", padding: "6px 8px 8px 0", fontSize: 10, color: "#AAA", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>BTC Change</th>
+            <th style={{ textAlign: "right", padding: "6px 8px 8px", fontSize: 10, color: "#AAA", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>{isLoan ? "Loan LTV" : "Portfolio LTV"}</th>
+            <th style={{ textAlign: "left", padding: "6px 8px 8px", fontSize: 10, color: "#AAA", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>Risk Zone</th>
+            <th style={{ textAlign: "left", padding: "6px 8px 8px", fontSize: 10, color: "#AAA", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} style={{ borderBottom: "0.5px solid #F4F3F0", background: row.isCurrent ? row.zone.bg : "transparent" }}>
+              <td style={{ padding: "10px 8px 10px 0", fontWeight: row.isCurrent ? 600 : 400, color: row.isCurrent ? "#1A1816" : "#555" }}>
+                {row.isCurrent ? "Current" : row.drawdownLabel}
+              </td>
+              <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 500, color: row.zone.color, fontVariantNumeric: "tabular-nums" }}>
+                {row.ltvFormatted}
+                {row.breachesAutoTopUp && !row.breachesLiquidation && <span style={{ marginLeft: 4, fontSize: 9, color: "#8B6914", background: "#FBF8EF", padding: "1px 4px", borderRadius: 3 }}>TOP-UP</span>}
+                {row.breachesLiquidation && <span style={{ marginLeft: 4, fontSize: 9, color: "#7B2D2D", background: "#FBF2F2", padding: "1px 4px", borderRadius: 3 }}>LIQ</span>}
+              </td>
+              <td style={{ padding: "10px 8px" }}><ZoneBadge zone={row.zone} /></td>
+              <td style={{ padding: "10px 8px", fontSize: 12, color: "#3A3835", lineHeight: 1.5 }}>{row.meaning}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function LoansTab({ loans, loanLtvs, editingLoan, setEditingLoan, showAddLoan, setShowAddLoan, newLoan, setNewLoan, handleAddLoan, handleSaveLoan, handleDeleteLoan, totalDebt, portfolioLtv, btcPrice, fmtUSD, fmtPct, fmt, ltvBarColor }) {
+  const [expandedLoans, setExpandedLoans] = useState({});
+  const [showBufferTooltip, setShowBufferTooltip] = useState(false);
+
+  const portfolioStress = btcPrice ? runPortfolioStressTest(loans, btcPrice) : [];
+  const buffer = btcPrice ? calcBtcBuffer(loans, btcPrice) : null;
+  const weakest = btcPrice ? getWeakestLink(loans, btcPrice) : null;
+  const historical = btcPrice ? runHistoricalScenarios(loans, btcPrice) : [];
+
+  const toggleLoan = (id) => setExpandedLoans(prev => ({ ...prev, [id]: !prev[id] }));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* ── 1. PORTFOLIO SUMMARY ── */}
+      <div className="metric-card">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase" }}>Portfolio Summary</div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Total Debt</div>
+            <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: "#1A1816", letterSpacing: "-0.02em" }}>{fmtUSD(totalDebt)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Portfolio LTV</div>
+            <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: ltvBarColor(portfolioLtv), letterSpacing: "-0.02em" }}>{fmtPct(portfolioLtv)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: "#6B6760", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Loans</div>
+            <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: "#1A1816", letterSpacing: "-0.02em" }}>{loans.length}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 2. LOAN MANAGEMENT ── */}
+      <div className="metric-card">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase" }}>Active Loans</div>
+          <button className="btn-ghost" onClick={() => setShowAddLoan(!showAddLoan)}>+ Add Loan</button>
+        </div>
+        {showAddLoan && (
+          <div style={{ background: "#F9F8F5", border: "0.5px solid #E8E7E4", borderRadius: 8, padding: 16, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
+              <div><div style={{ fontSize: 11, color: "#AAA", marginBottom: 4 }}>Lender</div><input className="inp" placeholder="e.g. Nexo" value={newLoan.lender} onChange={e => setNewLoan({ ...newLoan, lender: e.target.value })} /></div>
+              <div><div style={{ fontSize: 11, color: "#AAA", marginBottom: 4 }}>Debt (USD)</div><input className="inp" placeholder="0.00" type="number" value={newLoan.debt} onChange={e => setNewLoan({ ...newLoan, debt: e.target.value })} /></div>
+              <div><div style={{ fontSize: 11, color: "#AAA", marginBottom: 4 }}>Collateral (BTC)</div><input className="inp" placeholder="0.00" type="number" value={newLoan.collateral} onChange={e => setNewLoan({ ...newLoan, collateral: e.target.value })} /></div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn-primary" onClick={handleAddLoan}>Save Loan</button>
+              <button className="btn-ghost" onClick={() => setShowAddLoan(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
+        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr auto", gap: 12, padding: "0 0 8px", borderBottom: "0.5px solid #EBEBEB", marginBottom: 4 }}>
+          {["Lender", "Debt", "Collateral", "LTV", ""].map((h) => (<div key={h} style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.04em" }}>{h}</div>))}
+        </div>
+        {loans.map((loan, i) => {
+          const ltv = loanLtvs[i];
+          const isEditing = editingLoan?.id === loan.id;
+          return (
+            <div key={loan.id} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr auto", gap: 12, alignItems: "center", padding: "12px 0", borderBottom: "0.5px solid #F4F3F0" }}>
+              {isEditing ? (<>
+                <input className="inp" value={editingLoan.lender} onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })} />
+                <input className="inp" type="number" value={editingLoan.debt} onChange={e => setEditingLoan({ ...editingLoan, debt: e.target.value })} />
+                <input className="inp" type="number" value={editingLoan.collateral} onChange={e => setEditingLoan({ ...editingLoan, collateral: e.target.value })} />
+                <div style={{ fontSize: 13, color: ltvBarColor(ltv), fontWeight: 500 }}>{fmtPct(ltv)}</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button className="btn-primary" style={{ fontSize: 11, padding: "4px 10px" }} onClick={handleSaveLoan}>Save</button>
+                  <button className="btn-ghost" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => setEditingLoan(null)}>✕</button>
+                </div>
+              </>) : (<>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{loan.lender}</div>
+                <div style={{ fontSize: 13, color: "#555" }}>{fmtUSD(loan.debt)}</div>
+                <div style={{ fontSize: 13, color: "#555" }}>{fmt(loan.collateral, 3)} BTC</div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: ltvBarColor(ltv) }}>{fmtPct(ltv)}</div>
+                  <div className="ltv-bar-bg" style={{ width: 60 }}><div style={{ height: 4, width: `${Math.min(100, ltv * 100)}%`, background: ltvBarColor(ltv), borderRadius: 3, transition: "width 0.5s" }} /></div>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button className="btn-ghost" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => setEditingLoan({ ...loan })}>Edit</button>
+                  <button className="btn-ghost" style={{ fontSize: 11, padding: "4px 10px", color: "#C0392B", borderColor: "#F4C0C0" }} onClick={() => handleDeleteLoan(loan.id)}>✕</button>
+                </div>
+              </>)}
+            </div>
+          );
+        })}
+        {loans.length === 0 && <div style={{ textAlign: "center", padding: "32px 0", color: "#CCC", fontSize: 14 }}>No loans. Add one above.</div>}
+      </div>
+
+      {/* ── TREASURY INTELLIGENCE ── */}
+      {btcPrice && loans.length > 0 && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: 2, marginTop: 8 }}>
+            <span style={{ fontSize: 12, color: "#1A1816", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>Treasury Intelligence</span>
+            <div style={{ flex: 1, height: "1px", background: "#D8D4CC" }} />
+          </div>
+          <div style={{ fontSize: 12, color: "#888", marginTop: -12 }}>Understand how your treasury would respond to major Bitcoin drawdowns.</div>
+
+          {/* ── A. PORTFOLIO STRESS TEST ── */}
+          <IntelligenceHeading title="Portfolio Stress Test" />
+          <div className="metric-card">
+            <StressTable rows={portfolioStress} isLoan={false} />
+          </div>
+
+          {/* ── B. BTC BUFFER ── */}
+          <IntelligenceHeading title="BTC Buffer" />
+          {buffer && (
+            <div style={{ background: buffer.currentZone.bg, border: "0.5px solid " + buffer.currentZone.border, borderLeft: "4px solid " + buffer.currentZone.color, borderRadius: 14, padding: "24px 26px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: buffer.currentZone.color, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>BTC Buffer</div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 42, color: buffer.currentZone.color, letterSpacing: "-0.03em", lineHeight: 1 }}>
+                      {buffer.bufferPct !== null ? (buffer.bufferPct * 100).toFixed(0) + "%" : "—"}
+                    </span>
+                  </div>
+                </div>
+                <button onClick={() => setShowBufferTooltip(v => !v)} style={{ background: "#F5F3EF", border: "0.5px solid #D8D4CC", borderRadius: "50%", width: 24, height: 24, fontSize: 12, color: "#888", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>?</button>
+              </div>
+              {showBufferTooltip && (
+                <div style={{ background: "#F5F3EF", border: "0.5px solid #D8D4CC", borderRadius: 8, padding: "12px 14px", marginBottom: 14, fontSize: 12, color: "#555", lineHeight: 1.6 }}>
+                  <strong style={{ color: "#1A1816" }}>What is BTC Buffer?</strong><br />
+                  {buffer.tooltip}
+                </div>
+              )}
+              <div style={{ fontSize: 14, color: "#2A2725", lineHeight: 1.65, marginBottom: 16, paddingBottom: 16, borderBottom: "0.5px solid " + buffer.currentZone.border }}>
+                {buffer.meaning}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ background: buffer.currentZone.color + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + buffer.currentZone.border }}>
+                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Current Risk Zone</div>
+                  <div style={{ fontSize: 13, color: buffer.currentZone.color, fontWeight: 600 }}>{buffer.currentZone.label}</div>
+                </div>
+                <div style={{ background: buffer.currentZone.color + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + buffer.currentZone.border }}>
+                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Threshold Being Measured</div>
+                  <div style={{ fontSize: 13, color: "#1A1816", fontWeight: 600 }}>Elevated Risk (50% LTV)</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── C. WEAKEST LINK ── */}
+          <IntelligenceHeading title="Weakest Link" />
+          {weakest && (
+            <div style={{ background: weakest.currentZone.bg, border: "0.5px solid " + weakest.currentZone.border, borderLeft: "4px solid " + weakest.currentZone.color, borderRadius: 14, padding: "24px 26px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: weakest.currentZone.color, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 6 }}>Weakest Link</div>
+                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 24, color: "#1A1816", letterSpacing: "-0.02em" }}>{weakest.lender}</div>
+                </div>
+                <ZoneBadge zone={weakest.currentZone} />
+              </div>
+              <div style={{ fontSize: 14, color: "#2A2725", lineHeight: 1.65, marginBottom: 16, paddingBottom: 16, borderBottom: "0.5px solid " + weakest.currentZone.border }}>
+                {weakest.meaning}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <div style={{ background: weakest.currentZone.color + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + weakest.currentZone.border }}>
+                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Current LTV</div>
+                  <div style={{ fontSize: 16, color: weakest.currentZone.color, fontWeight: 600, fontFamily: "'DM Serif Display', serif" }}>{weakest.currentLtvFormatted}</div>
+                </div>
+                <div style={{ background: weakest.currentZone.color + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + weakest.currentZone.border }}>
+                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>BTC Buffer</div>
+                  <div style={{ fontSize: 16, color: "#1A1816", fontWeight: 600, fontFamily: "'DM Serif Display', serif" }}>{weakest.bufferPctFormatted}</div>
+                </div>
+                <div style={{ background: weakest.currentZone.color + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + weakest.currentZone.border }}>
+                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Risk Zone</div>
+                  <div style={{ fontSize: 13, color: weakest.currentZone.color, fontWeight: 600 }}>{weakest.currentZone.label}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── D. INDIVIDUAL LOAN STRESS TESTS ── */}
+          <IntelligenceHeading title="Individual Loan Stress Tests" />
+          {loans.map((loan, i) => {
+            const loanStress = runLoanStressTest(loan, btcPrice);
+            const currentRow = loanStress[0];
+            const loanBuffer = calcBtcBuffer([loan], btcPrice);
+            const isExpanded = expandedLoans[loan.id];
+            return (
+              <div key={loan.id} style={{ background: currentRow.zone.bg, border: "0.5px solid " + currentRow.zone.border, borderLeft: "4px solid " + currentRow.zone.color, borderRadius: 14, padding: "20px 24px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: currentRow.zone.color, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>Individual Loan</div>
+                    <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: "#1A1816", letterSpacing: "-0.02em" }}>{loan.lender}</div>
+                  </div>
+                  <ZoneBadge zone={currentRow.zone} />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 10, marginBottom: 14, paddingBottom: 14, borderBottom: "0.5px solid " + currentRow.zone.border }}>
+                  {[
+                    { label: "Debt", value: fmtUSD(loan.debt) },
+                    { label: "Collateral", value: (parseFloat(loan.collateral) || 0).toFixed(3) + " BTC" },
+                    { label: "Current LTV", value: currentRow.ltvFormatted },
+                    { label: "BTC Buffer", value: loanBuffer.bufferPctFormatted },
+                    { label: "Risk Zone", value: currentRow.zone.label },
+                  ].map(m => (
+                    <div key={m.label}>
+                      <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 3 }}>{m.label}</div>
+                      <div style={{ fontSize: 13, color: "#1A1816", fontWeight: 500 }}>{m.value}</div>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => toggleLoan(loan.id)} style={{ background: "none", border: "0.5px solid " + currentRow.zone.border, borderRadius: 6, cursor: "pointer", fontSize: 12, color: currentRow.zone.color, padding: "5px 12px", fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>
+                  {isExpanded ? "Hide Scenarios ▲" : "Show Scenarios ▼"}
+                </button>
+                {isExpanded && (
+                  <div style={{ marginTop: 14 }}>
+                    <StressTable rows={loanStress} isLoan={true} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* ── E. HISTORICAL STRESS SCENARIOS ── */}
+          <IntelligenceHeading title="Historical Stress Scenarios" />
+          <div style={{ fontSize: 12, color: "#888", marginTop: -12, marginBottom: 4 }}>How would your current structure have performed during major Bitcoin drawdowns?</div>
+          {historical.map((scenario, i) => (
+            <div key={i} style={{ background: scenario.portfolioZone.bg, border: "0.5px solid " + scenario.portfolioZone.border, borderLeft: "4px solid " + scenario.portfolioZone.color, borderRadius: 14, padding: "20px 24px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: "#1A1816", letterSpacing: "-0.01em", marginBottom: 2 }}>{scenario.name}</div>
+                  <div style={{ fontSize: 11, color: "#888" }}>{scenario.period} · {scenario.drawdownLabel} drawdown · BTC at {scenario.scenarioPriceFormatted}</div>
+                </div>
+                <ZoneBadge zone={scenario.portfolioZone} />
+              </div>
+              <div style={{ fontSize: 12, color: "#5A5855", lineHeight: 1.55, marginBottom: 14, paddingBottom: 14, borderBottom: "0.5px solid " + scenario.portfolioZone.border }}>
+                <span style={{ color: "#888", marginRight: 6 }}>Context:</span>{scenario.context}
+              </div>
+              <div style={{ fontSize: 14, color: "#2A2725", lineHeight: 1.6, marginBottom: 14, paddingBottom: 14, borderBottom: "0.5px solid " + scenario.portfolioZone.border }}>
+                {scenario.meaning}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <div style={{ background: scenario.portfolioZone.color + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + scenario.portfolioZone.border }}>
+                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Portfolio LTV</div>
+                  <div style={{ fontSize: 18, color: scenario.portfolioZone.color, fontWeight: 600, fontFamily: "'DM Serif Display', serif" }}>{scenario.portfolioLtvFormatted}</div>
+                </div>
+                <div style={{ background: scenario.portfolioZone.color + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + scenario.portfolioZone.border }}>
+                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Highest Loan LTV</div>
+                  <div style={{ fontSize: 18, color: scenario.highestLoanZone.color, fontWeight: 600, fontFamily: "'DM Serif Display', serif" }}>{scenario.highestLoanLtvFormatted}</div>
+                </div>
+                <div style={{ background: scenario.portfolioZone.color + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + scenario.portfolioZone.border }}>
+                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Outcome</div>
+                  <div style={{ fontSize: 13, color: scenario.wouldSurvive ? "#2D5A3D" : "#7B2D2D", fontWeight: 600 }}>{scenario.wouldSurvive ? "Would Survive" : "Intervention Required"}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [btcPrice, setBtcPrice] = useState(null);
   const [athPrice, setAthPrice] = useState(108000);
@@ -125,6 +450,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [dataLoaded, setDataLoaded] = useState(false);
   const [scoreHistory, setScoreHistory] = useState([]);
+  const [fearGreed, setFearGreed] = useState(null);
+  const [manualTimestamps, setManualTimestamps] = useState(DEFAULT_TIMESTAMPS);
 
   useEffect(() => {
     try {
@@ -135,6 +462,7 @@ export default function App() {
         if (d.manual) setManual(d.manual);
         if (d.nextId) setNextId(d.nextId);
         if (d.scoreHistory) setScoreHistory(d.scoreHistory);
+        if (d.manualTimestamps) setManualTimestamps(d.manualTimestamps);
       }
     } catch (e) {}
     setDataLoaded(true);
@@ -142,7 +470,7 @@ export default function App() {
 
   useEffect(() => {
     if (!dataLoaded) return;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ loans, manual, nextId, scoreHistory })); } catch (e) {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ loans, manual, nextId, scoreHistory, manualTimestamps })); } catch (e) {}
   }, [loans, manual, nextId, scoreHistory, dataLoaded]);
 
   useEffect(() => {
@@ -173,6 +501,22 @@ export default function App() {
       setLoading(false);
     }
     fetchData();
+
+    async function fetchFearGreed() {
+      try {
+        const res = await fetch("https://api.alternative.me/fng/?limit=2");
+        const data = await res.json();
+        if (data && data.data && data.data.length >= 2) {
+          setFearGreed({
+            value: parseInt(data.data[0].value),
+            label: data.data[0].value_classification,
+            prev: parseInt(data.data[1].value),
+            prevLabel: data.data[1].value_classification,
+          });
+        }
+      } catch (e) {}
+    }
+    fetchFearGreed();
   }, []);
 
   const scores = {
@@ -565,74 +909,20 @@ export default function App() {
 
         {/* ── LOANS TAB ── */}
         {activeTab === "loans" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <div className="metric-card">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase" }}>Active Loans</div>
-                <button className="btn-ghost" onClick={() => setShowAddLoan(!showAddLoan)}>+ Add Loan</button>
-              </div>
-              {showAddLoan && (
-                <div style={{ background: "#F9F8F5", border: "0.5px solid #E8E7E4", borderRadius: 8, padding: 16, marginBottom: 16 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
-                    <div><div style={{ fontSize: 11, color: "#AAA", marginBottom: 4 }}>Lender</div><input className="inp" placeholder="e.g. Nexo" value={newLoan.lender} onChange={e => setNewLoan({ ...newLoan, lender: e.target.value })} /></div>
-                    <div><div style={{ fontSize: 11, color: "#AAA", marginBottom: 4 }}>Debt (USD)</div><input className="inp" placeholder="0.00" type="number" value={newLoan.debt} onChange={e => setNewLoan({ ...newLoan, debt: e.target.value })} /></div>
-                    <div><div style={{ fontSize: 11, color: "#AAA", marginBottom: 4 }}>Collateral (BTC)</div><input className="inp" placeholder="0.00" type="number" value={newLoan.collateral} onChange={e => setNewLoan({ ...newLoan, collateral: e.target.value })} /></div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button className="btn-primary" onClick={handleAddLoan}>Save Loan</button>
-                    <button className="btn-ghost" onClick={() => setShowAddLoan(false)}>Cancel</button>
-                  </div>
-                </div>
-              )}
-              <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr auto", gap: 12, padding: "0 0 8px", borderBottom: "0.5px solid #EBEBEB", marginBottom: 4 }}>
-                {["Lender", "Debt", "Collateral", "LTV", ""].map((h) => (<div key={h} style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.04em" }}>{h}</div>))}
-              </div>
-              {loans.map((loan, i) => {
-                const ltv = loanLtvs[i];
-                const isEditing = editingLoan?.id === loan.id;
-                return (
-                  <div key={loan.id} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr auto", gap: 12, alignItems: "center", padding: "12px 0", borderBottom: "0.5px solid #F4F3F0" }}>
-                    {isEditing ? (<>
-                      <input className="inp" value={editingLoan.lender} onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })} />
-                      <input className="inp" type="number" value={editingLoan.debt} onChange={e => setEditingLoan({ ...editingLoan, debt: e.target.value })} />
-                      <input className="inp" type="number" value={editingLoan.collateral} onChange={e => setEditingLoan({ ...editingLoan, collateral: e.target.value })} />
-                      <div style={{ fontSize: 13, color: ltvBarColor(ltv), fontWeight: 500 }}>{fmtPct(ltv)}</div>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button className="btn-primary" style={{ fontSize: 11, padding: "4px 10px" }} onClick={handleSaveLoan}>Save</button>
-                        <button className="btn-ghost" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => setEditingLoan(null)}>✕</button>
-                      </div>
-                    </>) : (<>
-                      <div style={{ fontSize: 14, fontWeight: 500 }}>{loan.lender}</div>
-                      <div style={{ fontSize: 13, color: "#555" }}>{fmtUSD(loan.debt)}</div>
-                      <div style={{ fontSize: 13, color: "#555" }}>{fmt(loan.collateral, 3)} BTC</div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 500, color: ltvBarColor(ltv) }}>{fmtPct(ltv)}</div>
-                        <div className="ltv-bar-bg" style={{ width: 60 }}><div style={{ height: 4, width: `${Math.min(100, ltv * 100)}%`, background: ltvBarColor(ltv), borderRadius: 3, transition: "width 0.5s" }} /></div>
-                      </div>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button className="btn-ghost" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => setEditingLoan({ ...loan })}>Edit</button>
-                        <button className="btn-ghost" style={{ fontSize: 11, padding: "4px 10px", color: "#C0392B", borderColor: "#F4C0C0" }} onClick={() => handleDeleteLoan(loan.id)}>✕</button>
-                      </div>
-                    </>)}
-                  </div>
-                );
-              })}
-              {loans.length === 0 && <div style={{ textAlign: "center", padding: "32px 0", color: "#CCC", fontSize: 14 }}>No loans. Add one above.</div>}
-              <div style={{ marginTop: 16, paddingTop: 12, borderTop: "0.5px solid #EBEBEB", display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 13, color: "#888" }}>Total outstanding</span>
-                <span style={{ fontSize: 14, fontWeight: 500 }}>{fmtUSD(totalDebt)}</span>
-              </div>
-              <div style={{ marginTop: 6, display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 13, color: "#888" }}>Portfolio LTV</span>
-                <span style={{ fontSize: 14, fontWeight: 500, color: ltvBarColor(portfolioLtv) }}>{fmtPct(portfolioLtv)}</span>
-              </div>
-            </div>
-          </div>
+          <LoansTab
+            loans={loans} loanLtvs={loanLtvs} editingLoan={editingLoan} setEditingLoan={setEditingLoan}
+            showAddLoan={showAddLoan} setShowAddLoan={setShowAddLoan} newLoan={newLoan} setNewLoan={setNewLoan}
+            handleAddLoan={handleAddLoan} handleSaveLoan={handleSaveLoan} handleDeleteLoan={handleDeleteLoan}
+            totalDebt={totalDebt} portfolioLtv={portfolioLtv} btcPrice={btcPrice}
+            fmtUSD={fmtUSD} fmtPct={fmtPct} fmt={fmt} ltvBarColor={ltvBarColor}
+          />
         )}
 
         {/* ── INDICATORS TAB ── */}
         {activeTab === "indicators" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+            {/* Automatic */}
             <div className="metric-card">
               <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Automatic Indicators</div>
               <div style={{ fontSize: 12, color: "#C8963A", marginBottom: 16 }}>Pulled from CoinGecko — updates on page load</div>
@@ -649,23 +939,102 @@ export default function App() {
                 </div>
               ))}
             </div>
+
+            {/* Fear & Greed */}
+            <div className="metric-card">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase" }}>Fear & Greed Index</div>
+                <span style={{ fontSize: 10, color: "#C8963A", background: "#FDF3E3", padding: "1px 6px", borderRadius: 3, letterSpacing: "0.04em" }}>AUTO</span>
+              </div>
+              <div style={{ fontSize: 12, color: "#AAA", marginBottom: 16 }}>Reference only — not weighted in the signal score</div>
+              {fearGreed ? (
+                <div>
+                  {/* Today */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 12, marginBottom: 12, borderBottom: "0.5px solid #EBEBEB" }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>Today</div>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                        <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, color: fearGreed.value >= 75 ? "#7B2D2D" : fearGreed.value >= 55 ? "#8B6914" : fearGreed.value >= 45 ? "#4A4845" : fearGreed.value >= 25 ? "#4A7C5A" : "#2D5A3D", letterSpacing: "-0.02em" }}>{fearGreed.value}</span>
+                        <span style={{ fontSize: 13, color: "#555", fontWeight: 500 }}>{fearGreed.label}</span>
+                      </div>
+                    </div>
+                    {/* Mini gauge */}
+                    <div style={{ width: 120 }}>
+                      <div style={{ height: 6, borderRadius: 3, background: "linear-gradient(to right, #2D5A3D, #4A7C5A, #9A9590, #C88A1A, #A83030)", position: "relative", marginBottom: 4 }}>
+                        <div style={{ position: "absolute", top: "50%", left: fearGreed.value + "%", transform: "translate(-50%, -50%)", width: 10, height: 10, borderRadius: "50%", background: "#fff", border: "2px solid #1A1816", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#CCC" }}>
+                        <span>Fear</span><span>Greed</span>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Yesterday */}
+                  <div className="ind-row">
+                    <span style={{ fontSize: 13, color: "#888" }}>Yesterday</span>
+                    <span style={{ fontSize: 13, color: "#555" }}>{fearGreed.prev} — {fearGreed.prevLabel}</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: "#CCC", padding: "8px 0" }}>Loading…</div>
+              )}
+            </div>
+
+            {/* Manual */}
             <div className="metric-card">
               <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Manual Indicators</div>
               <div style={{ fontSize: 12, color: "#AAA", marginBottom: 16 }}>Update weekly from Glassnode, CryptoQuant, or similar</div>
-              <div style={{ display: "grid", gap: 14 }}>
+              <div style={{ display: "grid", gap: 18 }}>
+
+                {/* MVRV */}
                 <div>
-                  <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>MVRV Z-Score <span style={{ color: "#CCC" }}>(current: {manual.mvrv})</span></div>
-                  <input className="inp" type="number" step="0.01" value={manual.mvrv} onChange={e => setManual({ ...manual, mvrv: e.target.value })} style={{ maxWidth: 180 }} />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ fontSize: 12, color: "#888" }}>MVRV Z-Score <span style={{ color: "#CCC" }}>(current: {manual.mvrv})</span></div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: staleness(manualTimestamps.mvrv).dot }} />
+                      <span style={{ fontSize: 11, color: staleness(manualTimestamps.mvrv).color }}>{staleness(manualTimestamps.mvrv).label}</span>
+                    </div>
+                  </div>
+                  <input className="inp" type="number" step="0.01" value={manual.mvrv}
+                    onChange={e => {
+                      setManual({ ...manual, mvrv: e.target.value });
+                      setManualTimestamps({ ...manualTimestamps, mvrv: new Date().toISOString() });
+                    }}
+                    style={{ maxWidth: 180 }} />
                   <div style={{ fontSize: 11, color: "#CCC", marginTop: 4 }}>Bullish &lt; 1.0 · Bearish &gt; 6.0</div>
                 </div>
+
+                {/* Puell */}
                 <div>
-                  <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>Puell Multiple <span style={{ color: "#CCC" }}>(current: {manual.puell})</span></div>
-                  <input className="inp" type="number" step="0.01" value={manual.puell} onChange={e => setManual({ ...manual, puell: e.target.value })} style={{ maxWidth: 180 }} />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ fontSize: 12, color: "#888" }}>Puell Multiple <span style={{ color: "#CCC" }}>(current: {manual.puell})</span></div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: staleness(manualTimestamps.puell).dot }} />
+                      <span style={{ fontSize: 11, color: staleness(manualTimestamps.puell).color }}>{staleness(manualTimestamps.puell).label}</span>
+                    </div>
+                  </div>
+                  <input className="inp" type="number" step="0.01" value={manual.puell}
+                    onChange={e => {
+                      setManual({ ...manual, puell: e.target.value });
+                      setManualTimestamps({ ...manualTimestamps, puell: new Date().toISOString() });
+                    }}
+                    style={{ maxWidth: 180 }} />
                   <div style={{ fontSize: 11, color: "#CCC", marginTop: 4 }}>Bullish &lt; 0.5 · Bearish &gt; 4.0</div>
                 </div>
+
+                {/* LTH */}
                 <div>
-                  <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>LTH Supply Trend</div>
-                  <select className="sel" value={manual.lthTrend} onChange={e => setManual({ ...manual, lthTrend: e.target.value })}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ fontSize: 12, color: "#888" }}>LTH Supply Trend</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: staleness(manualTimestamps.lthTrend).dot }} />
+                      <span style={{ fontSize: 11, color: staleness(manualTimestamps.lthTrend).color }}>{staleness(manualTimestamps.lthTrend).label}</span>
+                    </div>
+                  </div>
+                  <select className="sel" value={manual.lthTrend}
+                    onChange={e => {
+                      setManual({ ...manual, lthTrend: e.target.value });
+                      setManualTimestamps({ ...manualTimestamps, lthTrend: new Date().toISOString() });
+                    }}>
                     <option value="Accumulating">Accumulating</option>
                     <option value="Neutral">Neutral</option>
                     <option value="Dumping">Dumping</option>
@@ -673,6 +1042,8 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+            {/* Weights */}
             <div className="metric-card">
               <div style={{ fontSize: 11, color: "#AAA", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 14 }}>Indicator Weights</div>
               {Object.entries(WEIGHTS).map(([k, w]) => {
