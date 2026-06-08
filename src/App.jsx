@@ -391,40 +391,7 @@ function LoansTab({ loans, loanLtvs, editingLoan, setEditingLoan, showAddLoan, s
             );
           })}
 
-          {/* ── E. HISTORICAL STRESS SCENARIOS ── */}
-          <IntelligenceHeading title="Historical Stress Scenarios" />
-          <div style={{ fontSize: 12, color: "#888", marginTop: -12, marginBottom: 4 }}>How would your current structure have performed during major Bitcoin drawdowns?</div>
-          {historical.map((scenario, i) => (
-            <div key={i} style={{ background: scenario.portfolioZone.bg, border: "0.5px solid " + scenario.portfolioZone.border, borderLeft: "4px solid " + scenario.portfolioZone.color, borderRadius: 14, padding: "20px 24px" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: "#1A1816", letterSpacing: "-0.01em", marginBottom: 2 }}>{scenario.name}</div>
-                  <div style={{ fontSize: 11, color: "#888" }}>{scenario.period} · {scenario.drawdownLabel} drawdown · BTC at {scenario.scenarioPriceFormatted}</div>
-                </div>
-                <ZoneBadge zone={scenario.portfolioZone} />
-              </div>
-              <div style={{ fontSize: 12, color: "#5A5855", lineHeight: 1.55, marginBottom: 14, paddingBottom: 14, borderBottom: "0.5px solid " + scenario.portfolioZone.border }}>
-                <span style={{ color: "#888", marginRight: 6 }}>Context:</span>{scenario.context}
-              </div>
-              <div style={{ fontSize: 14, color: "#2A2725", lineHeight: 1.6, marginBottom: 14, paddingBottom: 14, borderBottom: "0.5px solid " + scenario.portfolioZone.border }}>
-                {scenario.meaning}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                <div style={{ background: scenario.portfolioZone.color + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + scenario.portfolioZone.border }}>
-                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Portfolio LTV</div>
-                  <div style={{ fontSize: 18, color: scenario.portfolioZone.color, fontWeight: 600, fontFamily: "'DM Serif Display', serif" }}>{scenario.portfolioLtvFormatted}</div>
-                </div>
-                <div style={{ background: scenario.portfolioZone.color + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + scenario.portfolioZone.border }}>
-                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Highest Loan LTV</div>
-                  <div style={{ fontSize: 18, color: scenario.highestLoanZone.color, fontWeight: 600, fontFamily: "'DM Serif Display', serif" }}>{scenario.highestLoanLtvFormatted}</div>
-                </div>
-                <div style={{ background: scenario.portfolioZone.color + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + scenario.portfolioZone.border }}>
-                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Outcome</div>
-                  <div style={{ fontSize: 13, color: scenario.wouldSurvive ? "#2D5A3D" : "#7B2D2D", fontWeight: 600 }}>{scenario.wouldSurvive ? "Would Survive" : "Intervention Required"}</div>
-                </div>
-              </div>
-            </div>
-          ))}
+
         </>
       )}
     </div>
