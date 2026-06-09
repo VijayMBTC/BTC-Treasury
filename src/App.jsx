@@ -349,85 +349,6 @@ function LoansTab({ loans, loanLtvs, editingLoan, setEditingLoan, showAddLoan, s
             </div>
           )}
 
-          {/* ── C2. OPPORTUNITY COST ── */}
-          {(() => {
-            const TARGET_LTV = 0.45;
-            const CAPACITY_THRESHOLD = 0.50;
-            const totalDebt = loans.reduce((s, l) => s + (parseFloat(l.debt) || 0), 0);
-            const totalCollateral = loans.reduce((s, l) => s + (parseFloat(l.collateral) || 0), 0);
-            const collateralValue = totalCollateral * btcPrice;
-            const currentLtv = totalDebt / collateralValue;
-            const capacityAtTarget = (collateralValue * TARGET_LTV) - totalDebt;
-            const isAboveThreshold = currentLtv >= CAPACITY_THRESHOLD;
-            const zoneColor = isAboveThreshold ? "#4A4845" : capacityAtTarget > 0 ? "#1E3F5A" : "#4A4845";
-            const zoneBg = isAboveThreshold ? "#F5F3EF" : capacityAtTarget > 0 ? "#F2F6FA" : "#F5F3EF";
-            const zoneBorder = isAboveThreshold ? "#C8C4BC" : capacityAtTarget > 0 ? "#8AAEC8" : "#C8C4BC";
-            const utilisationPct = Math.min(100, (currentLtv / TARGET_LTV) * 100);
-            const fmtUSDLocal = (n) => "$" + Number(Math.round(n)).toLocaleString("en-US");
-
-            return (
-              <div>
-                <IntelligenceHeading title="Additional Capital Capacity" />
-                <div style={{ background: zoneBg, border: "0.5px solid " + zoneBorder, borderLeft: "4px solid " + zoneColor, borderRadius: 14, padding: "24px 26px" }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6 }}>
-                    <div>
-                      <div style={{ fontSize: 10, color: zoneColor, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Additional Capital Capacity</div>
-                      {isAboveThreshold ? (
-                        <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 22, color: "#4A4845", letterSpacing: "-0.02em", lineHeight: 1.2 }}>Not Applicable</div>
-                      ) : capacityAtTarget > 0 ? (
-                        <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 34, color: zoneColor, letterSpacing: "-0.03em", lineHeight: 1 }}>{fmtUSDLocal(capacityAtTarget)}</div>
-                      ) : (
-                        <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 22, color: "#4A4845", letterSpacing: "-0.02em", lineHeight: 1.2 }}>At Capacity</div>
-                      )}
-                    </div>
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Current LTV</div>
-                      <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: zoneColor, letterSpacing: "-0.02em" }}>{(currentLtv * 100).toFixed(1)}%</div>
-                    </div>
-                  </div>
-
-                  <div style={{ fontSize: 11, color: "#888", marginBottom: 16 }}>
-                    Based on: Target LTV 45% · BTC at {fmtUSDLocal(btcPrice)}
-                  </div>
-
-                  <div style={{ fontSize: 14, color: "#2A2725", lineHeight: 1.65, marginBottom: 18, paddingBottom: 18, borderBottom: "0.5px solid " + zoneBorder }}>
-                    {isAboveThreshold
-                      ? "Portfolio LTV is above 50%. Capital capacity is not a relevant consideration at this level. Focus on reducing leverage before assessing available headroom."
-                      : capacityAtTarget > 0
-                      ? "At a 45% LTV, there may be capacity to access an additional " + fmtUSDLocal(capacityAtTarget) + " against your existing collateral. This reflects the difference between your current debt and what a 45% LTV structure would permit."
-                      : "Your current debt already exceeds a 45% LTV against your collateral. There is no additional capacity at the target threshold."}
-                  </div>
-
-                  {!isAboveThreshold && (
-                    <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#888", marginBottom: 6, letterSpacing: "0.04em" }}>
-                        <span>Current utilisation</span>
-                        <span>{utilisationPct.toFixed(0)}% of target capacity used</span>
-                      </div>
-                      <div style={{ height: 6, borderRadius: 3, background: "#E8E7E4", position: "relative", marginBottom: 16 }}>
-                        <div style={{ height: "100%", width: Math.min(100, utilisationPct) + "%", background: utilisationPct > 90 ? "#8B6914" : zoneColor, borderRadius: 3, transition: "width 0.6s ease" }} />
-                      </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                        <div style={{ background: zoneColor + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + zoneBorder }}>
-                          <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Current Debt</div>
-                          <div style={{ fontSize: 15, color: "#1A1816", fontWeight: 600, fontFamily: "'DM Serif Display', serif" }}>{fmtUSDLocal(totalDebt)}</div>
-                        </div>
-                        <div style={{ background: zoneColor + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + zoneBorder }}>
-                          <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Capacity at 45% LTV</div>
-                          <div style={{ fontSize: 15, color: "#1A1816", fontWeight: 600, fontFamily: "'DM Serif Display', serif" }}>{fmtUSDLocal(collateralValue * TARGET_LTV)}</div>
-                        </div>
-                        <div style={{ background: zoneColor + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + zoneBorder }}>
-                          <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Available Headroom</div>
-                          <div style={{ fontSize: 15, color: capacityAtTarget > 0 ? zoneColor : "#888", fontWeight: 600, fontFamily: "'DM Serif Display', serif" }}>{capacityAtTarget > 0 ? fmtUSDLocal(capacityAtTarget) : "—"}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-
           {/* ── D. INDIVIDUAL LOAN STRESS TESTS ── */}
           <IntelligenceHeading title="Individual Loan Stress Tests" />
           {loans.map((loan, i) => {
@@ -470,11 +391,169 @@ function LoansTab({ loans, loanLtvs, editingLoan, setEditingLoan, showAddLoan, s
             );
           })}
 
-
+          {/* ── E. HISTORICAL STRESS SCENARIOS ── */}
+          <IntelligenceHeading title="Historical Stress Scenarios" />
+          <div style={{ fontSize: 12, color: "#888", marginTop: -12, marginBottom: 4 }}>How would your current structure have performed during major Bitcoin drawdowns?</div>
+          {historical.map((scenario, i) => (
+            <div key={i} style={{ background: scenario.portfolioZone.bg, border: "0.5px solid " + scenario.portfolioZone.border, borderLeft: "4px solid " + scenario.portfolioZone.color, borderRadius: 14, padding: "20px 24px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: "#1A1816", letterSpacing: "-0.01em", marginBottom: 2 }}>{scenario.name}</div>
+                  <div style={{ fontSize: 11, color: "#888" }}>{scenario.period} · {scenario.drawdownLabel} drawdown · BTC at {scenario.scenarioPriceFormatted}</div>
+                </div>
+                <ZoneBadge zone={scenario.portfolioZone} />
+              </div>
+              <div style={{ fontSize: 12, color: "#5A5855", lineHeight: 1.55, marginBottom: 14, paddingBottom: 14, borderBottom: "0.5px solid " + scenario.portfolioZone.border }}>
+                <span style={{ color: "#888", marginRight: 6 }}>Context:</span>{scenario.context}
+              </div>
+              <div style={{ fontSize: 14, color: "#2A2725", lineHeight: 1.6, marginBottom: 14, paddingBottom: 14, borderBottom: "0.5px solid " + scenario.portfolioZone.border }}>
+                {scenario.meaning}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <div style={{ background: scenario.portfolioZone.color + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + scenario.portfolioZone.border }}>
+                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Portfolio LTV</div>
+                  <div style={{ fontSize: 18, color: scenario.portfolioZone.color, fontWeight: 600, fontFamily: "'DM Serif Display', serif" }}>{scenario.portfolioLtvFormatted}</div>
+                </div>
+                <div style={{ background: scenario.portfolioZone.color + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + scenario.portfolioZone.border }}>
+                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Highest Loan LTV</div>
+                  <div style={{ fontSize: 18, color: scenario.highestLoanZone.color, fontWeight: 600, fontFamily: "'DM Serif Display', serif" }}>{scenario.highestLoanLtvFormatted}</div>
+                </div>
+                <div style={{ background: scenario.portfolioZone.color + "0A", borderRadius: 8, padding: "10px 14px", border: "0.5px solid " + scenario.portfolioZone.border }}>
+                  <div style={{ fontSize: 9, color: "#6B6760", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 4 }}>Outcome</div>
+                  <div style={{ fontSize: 13, color: scenario.wouldSurvive ? "#2D5A3D" : "#7B2D2D", fontWeight: 600 }}>{scenario.wouldSurvive ? "Would Survive" : "Intervention Required"}</div>
+                </div>
+              </div>
+            </div>
+          ))}
         </>
       )}
     </div>
   );
+}
+
+// ── TREASURY HEALTH ENGINE ────────────────────────────────────
+function calcTreasuryHealth(loans, btcPrice, portfolioLtv, maxLtv) {
+  if (!btcPrice || !loans || loans.length === 0) return null;
+
+  const totalDebt = loans.reduce((s, l) => s + (parseFloat(l.debt) || 0), 0);
+  const totalCollateral = loans.reduce((s, l) => s + (parseFloat(l.collateral) || 0), 0);
+  const collateralValue = totalCollateral * btcPrice;
+
+  // ── PILLAR 1: TREASURY RESILIENCE (45%) ──
+  // BTC Buffer score
+  const elevatedThreshold = 0.50;
+  const priceAtElevated = totalDebt / (totalCollateral * elevatedThreshold);
+  const bufferPct = priceAtElevated < btcPrice ? (btcPrice - priceAtElevated) / btcPrice : 0;
+  let bufferScore = 0;
+  if (bufferPct >= 0.60) bufferScore = 45;
+  else if (bufferPct >= 0.40) bufferScore = 38;
+  else if (bufferPct >= 0.25) bufferScore = 28;
+  else if (bufferPct >= 0.10) bufferScore = 18;
+  else bufferScore = 8;
+
+  // Risk zone score
+  let riskZoneScore = 0;
+  if (portfolioLtv < 0.20) riskZoneScore = 45;
+  else if (portfolioLtv < 0.35) riskZoneScore = 38;
+  else if (portfolioLtv < 0.50) riskZoneScore = 25;
+  else if (portfolioLtv < 0.65) riskZoneScore = 12;
+  else riskZoneScore = 4;
+
+  const resilienceRaw = (bufferScore + riskZoneScore) / 2;
+  const resilienceScore = Math.round((resilienceRaw / 45) * 45);
+
+  // ── PILLAR 2: LEVERAGE QUALITY (30%) ──
+  let portfolioLtvScore = 0;
+  if (portfolioLtv < 0.20) portfolioLtvScore = 30;
+  else if (portfolioLtv < 0.30) portfolioLtvScore = 26;
+  else if (portfolioLtv < 0.40) portfolioLtvScore = 20;
+  else if (portfolioLtv < 0.50) portfolioLtvScore = 14;
+  else if (portfolioLtv < 0.65) portfolioLtvScore = 7;
+  else portfolioLtvScore = 2;
+
+  let maxLtvPenalty = 0;
+  if (maxLtv > portfolioLtv + 0.15) maxLtvPenalty = 4;
+  else if (maxLtv > portfolioLtv + 0.08) maxLtvPenalty = 2;
+
+  const leverageScore = Math.max(0, Math.round(portfolioLtvScore - maxLtvPenalty));
+
+  // ── PILLAR 3: CAPITAL EFFICIENCY (25%) ──
+  // Penalise high LTV (no capacity = low efficiency)
+  // Also penalise heavily underutilised collateral
+  const TARGET_LTV = 0.45;
+  const utilisation = portfolioLtv / TARGET_LTV;
+  let efficiencyScore = 0;
+  if (portfolioLtv >= 0.50) {
+    // Above threshold — penalise
+    if (portfolioLtv >= 0.65) efficiencyScore = 4;
+    else if (portfolioLtv >= 0.50) efficiencyScore = 10;
+  } else if (utilisation >= 0.55 && utilisation <= 1.0) {
+    // Sweet spot — good utilisation within safe range
+    efficiencyScore = 25;
+  } else if (utilisation >= 0.35) {
+    efficiencyScore = 18;
+  } else {
+    // Very underutilised — idle collateral
+    efficiencyScore = 12;
+  }
+
+  // ── TOTAL ──
+  const total = Math.min(100, resilienceScore + leverageScore + efficiencyScore);
+
+  // ── RATING ──
+  let rating, ratingColor, ratingBg, ratingBorder;
+  if (total >= 90) { rating = "Excellent"; ratingColor = "#1A5C38"; ratingBg = "#EDF7F2"; ratingBorder = "#7DC4A0"; }
+  else if (total >= 75) { rating = "Healthy"; ratingColor = "#2D5A3D"; ratingBg = "#F2F8F4"; ratingBorder = "#8FBD9E"; }
+  else if (total >= 60) { rating = "Stable"; ratingColor = "#4A4845"; ratingBg = "#F5F3EF"; ratingBorder = "#C8C4BC"; }
+  else if (total >= 40) { rating = "Needs Attention"; ratingColor = "#8B6914"; ratingBg = "#FBF8EF"; ratingBorder = "#D4BC7A"; }
+  else { rating = "High Risk"; ratingColor = "#7B2D2D"; ratingBg = "#FBF2F2"; ratingBorder = "#D4A8A8"; }
+
+  // ── MEANING ──
+  let meaning = "";
+  if (total >= 90) meaning = "Your treasury is in excellent condition. Leverage is conservative, your buffer against further declines is strong, and your collateral is being put to good use.";
+  else if (total >= 75) meaning = "Your treasury structure is healthy. Leverage levels are manageable and your portfolio has meaningful resilience to Bitcoin price declines.";
+  else if (total >= 60) meaning = "Your treasury is stable but has areas worth monitoring. No immediate action is required, though some aspects of the structure could be strengthened.";
+  else if (total >= 40) meaning = "Your treasury structure needs attention. One or more pillars are under pressure and the portfolio's resilience to further declines is limited.";
+  else meaning = "Your treasury is under significant stress. Leverage is elevated and the portfolio has limited capacity to absorb further Bitcoin price declines without intervention.";
+
+  // ── KEY DRIVERS ──
+  const strengths = [];
+  const improvements = [];
+
+  if (bufferPct >= 0.40) strengths.push("Strong BTC Buffer");
+  else if (bufferPct < 0.15) improvements.push("Thin downside buffer");
+
+  if (portfolioLtv < 0.25) strengths.push("Conservative portfolio LTV");
+  else if (portfolioLtv >= 0.50) improvements.push("Elevated portfolio LTV");
+
+  if (maxLtv < 0.30) strengths.push("Low loan concentration risk");
+  else if (maxLtv > portfolioLtv + 0.15) improvements.push("High individual loan LTV");
+
+  if (utilisation >= 0.55 && utilisation <= 1.0 && portfolioLtv < 0.50) strengths.push("Efficient collateral utilisation");
+  else if (utilisation < 0.35) improvements.push("Collateral may be underutilised");
+  else if (portfolioLtv >= 0.50) improvements.push("Limited additional capital capacity");
+
+  if (portfolioLtv < 0.20) strengths.push("Very low liquidation risk");
+  else if (portfolioLtv >= 0.65) improvements.push("Liquidation risk is elevated");
+
+  return {
+    total,
+    resilienceScore,
+    leverageScore,
+    efficiencyScore,
+    rating,
+    ratingColor,
+    ratingBg,
+    ratingBorder,
+    meaning,
+    strengths: strengths.slice(0, 3),
+    improvements: improvements.slice(0, 3),
+    pillars: [
+      { label: "Treasury Resilience", score: resilienceScore, max: 45, description: "BTC Buffer strength and current risk zone" },
+      { label: "Leverage Quality", score: leverageScore, max: 30, description: "Portfolio LTV and loan concentration" },
+      { label: "Capital Efficiency", score: efficiencyScore, max: 25, description: "Collateral utilisation relative to target LTV" },
+    ]
+  };
 }
 
 export default function App() {
@@ -585,6 +664,7 @@ export default function App() {
   const marketOutlook = getMarketOutlook(totalScore);
   const loanStrategy = getLoanStrategy(portfolioLtv, maxLtv);
   const btcStrategy = getBtcStrategy(marketOutlook.level, loanStrategy.level);
+  const treasuryHealth = calcTreasuryHealth(loans, btcPrice, portfolioLtv, maxLtv);
 
   const distFromATH = btcPrice && athPrice ? ((btcPrice - athPrice) / athPrice) : null;
 
@@ -754,6 +834,80 @@ export default function App() {
         {/* ── DASHBOARD ── */}
         {activeTab === "dashboard" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+            {/* ── 0. TREASURY HEALTH ── */}
+            {treasuryHealth && (
+              <>
+                <SectionHeading title="Treasury Health" />
+                <div style={{ background: treasuryHealth.ratingBg, border: "0.5px solid " + treasuryHealth.ratingBorder, borderLeft: "5px solid " + treasuryHealth.ratingColor, borderRadius: 16, padding: "28px 28px 24px", boxShadow: "0 2px 12px rgba(20,18,14,0.07), 0 1px 3px rgba(20,18,14,0.05)" }}>
+
+                  {/* Score + Rating */}
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 18 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: treasuryHealth.ratingColor, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Treasury Health</div>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                        <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 52, color: treasuryHealth.ratingColor, letterSpacing: "-0.03em", lineHeight: 1 }}>{treasuryHealth.total}</span>
+                        <span style={{ fontSize: 18, color: treasuryHealth.ratingColor, opacity: 0.5, fontFamily: "'DM Serif Display', serif" }}>/ 100</span>
+                      </div>
+                    </div>
+                    <span style={{ display: "inline-block", background: treasuryHealth.ratingColor, color: "#FAF8F5", fontSize: 12, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", padding: "6px 14px", borderRadius: 6 }}>{treasuryHealth.rating}</span>
+                  </div>
+
+                  {/* Meaning */}
+                  <div style={{ fontSize: 14, color: "#2A2725", lineHeight: 1.65, marginBottom: 20, paddingBottom: 20, borderBottom: "0.5px solid " + treasuryHealth.ratingBorder }}>
+                    {treasuryHealth.meaning}
+                  </div>
+
+                  {/* Pillar bars */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20, paddingBottom: 20, borderBottom: "0.5px solid " + treasuryHealth.ratingBorder }}>
+                    {treasuryHealth.pillars.map(p => (
+                      <div key={p.label}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
+                          <div>
+                            <span style={{ fontSize: 13, color: "#2A2725", fontWeight: 500 }}>{p.label}</span>
+                            <span style={{ fontSize: 11, color: "#888", marginLeft: 8 }}>{p.description}</span>
+                          </div>
+                          <span style={{ fontSize: 13, color: treasuryHealth.ratingColor, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{p.score}<span style={{ fontSize: 10, color: "#AAA", fontWeight: 400 }}>/{p.max}</span></span>
+                        </div>
+                        <div style={{ height: 6, borderRadius: 3, background: "#E8E7E4" }}>
+                          <div style={{ height: "100%", width: Math.round((p.score / p.max) * 100) + "%", background: treasuryHealth.ratingColor, borderRadius: 3, opacity: 0.85, transition: "width 0.6s ease" }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Key Drivers */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    {treasuryHealth.strengths.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 10, color: "#2D5A3D", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Strongest Contributors</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {treasuryHealth.strengths.map((s, i) => (
+                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#2D5A3D", flexShrink: 0 }} />
+                              <span style={{ fontSize: 13, color: "#2A2825" }}>{s}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {treasuryHealth.improvements.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 10, color: "#8B6914", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Areas to Consider</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {treasuryHealth.improvements.map((s, i) => (
+                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#8B6914", flexShrink: 0 }} />
+                              <span style={{ fontSize: 13, color: "#2A2825" }}>{s}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* ── 1. MARKET OUTLOOK ── */}
             <SectionHeading title="Market Outlook" />
